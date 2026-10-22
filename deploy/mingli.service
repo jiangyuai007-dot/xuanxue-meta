@@ -1,0 +1,30 @@
+[Unit]
+Description=mingli-app (xuanxue-meta fortune web app)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mingli
+Group=mingli
+WorkingDirectory=/opt/mingli/app
+# 密钥放 /etc/mingli/mingli.env（root 0600），由 systemd 以 root 读取后传入进程
+EnvironmentFile=/etc/mingli/mingli.env
+ExecStart=/usr/bin/node src/server/index.js
+Restart=always
+RestartSec=2
+
+# 日志进 journald：journalctl -u mingli -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mingli
+
+# —— 安全加固：应用只许写 data/，其余文件系统只读 ——
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mingli/app/data
+
+[Install]
+WantedBy=multi-user.target

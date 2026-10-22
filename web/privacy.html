@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>隐私政策 · 玄机</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.legal{max-width:920px;margin:0 auto;padding:var(--sp-5) var(--sp-4) var(--sp-6)}
+.legal h1{font-family:var(--serif);font-size:var(--fs-xl);color:var(--ink);margin-bottom:var(--sp-2);letter-spacing:1px}
+.legal .updated{color:var(--sub);font-size:var(--fs-sm);margin-bottom:var(--sp-5)}
+.legal h2{font-family:var(--serif);font-size:var(--fs-lg);color:var(--gold-ink);margin:var(--sp-6) 0 var(--sp-3);padding-left:10px;border-left:3px solid var(--gold)}
+.legal h3{font-family:var(--serif);font-size:var(--fs-md);color:var(--ink);margin:var(--sp-4) 0 var(--sp-2)}
+.legal p{font-size:var(--fs-md);color:var(--ink-2);line-height:1.9;margin-bottom:var(--sp-3)}
+.legal ul,.legal ol{margin:0 0 var(--sp-3) var(--sp-5);color:var(--ink-2);font-size:var(--fs-md);line-height:1.9}
+.legal li{margin-bottom:var(--sp-2)}
+.legal .note{background:var(--gold-soft);border:1px solid var(--line-strong);border-radius:var(--r-md);padding:var(--sp-3) var(--sp-4);color:var(--gold-ink);font-size:var(--fs-sm);margin:var(--sp-3) 0}
+.legal a.inline{color:var(--gold-ink);text-decoration:none;border-bottom:1px solid var(--line-strong)}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">玄</span>
+    <div class="brand-txt"><strong>玄机</strong><em>东方命理内容平台</em></div>
+  </div>
+  <nav class="tabs">
+    <a class="tab" href="bazi.html">返回</a>
+  </nav>
+</header>
+
+<main class="legal">
+  <h1>隐私政策</h1>
+  <p class="updated">最近更新：2026-09-27（上线前版本，联系邮箱为占位，上线前需替换）</p>
+
+  <div class="note">
+    本产品为传统文化与自我探索类内容工具。我们遵循<strong>最小必要</strong>原则收集和处理数据：能不收集的绝不收集，能本地处理的绝不外传。
+  </div>
+
+  <h2>一、我们收集哪些信息</h2>
+  <p>为生成排盘与解读，你需要提供排盘所需的<strong>出生/起卦信息</strong>（如公历或农历生辰、性别、出生地、所问事项等）。这些信息仅用于当次推算，属于<strong>必要输入</strong>。</p>
+  <p>除此之外，我们<strong>不要求</strong>你提供姓名、身份证、手机号、通讯录、位置轨迹、相册等任何可识别个人身份的信息。产品内也<strong>没有</strong>注册账号体系，因此不存在账号类个人信息的收集。</p>
+
+  <h2>二、排盘数据如何处理（重要）</h2>
+  <p>关于"你输入的内容"与"推算结果"，我们的处理方式是：</p>
+  <ul>
+    <li><strong>默认在本地 / 本次会话内处理：</strong>排盘与解读的核心计算在你所使用的环境（本机浏览器或服务端内存）内完成，输入内容不会用于任何画像、推荐或对外共享。</li>
+    <li><strong>服务端仅按输入哈希缓存排盘结果：</strong>为加速重复请求，服务端会将排盘结果以"输入内容的哈希值"为键，缓存于 <code>data/cache</code> 目录。该缓存<strong>不含姓名等任何身份信息</strong>，无法反推出你是谁，仅用于"相同输入更快出结果"。</li>
+    <li><strong>不留存原始输入映射：</strong>我们不在服务端保存"哈希 → 原始生辰/姓名"的对应关系，因此即使缓存被获取，也无法还原出具体个人。</li>
+  </ul>
+
+  <h2>三、浏览器本地存储（localStorage）的用途</h2>
+  <p>为方便你复用，产品会在你本机浏览器的 <code>localStorage</code> 中保存以下数据：</p>
+  <ul>
+    <li><strong>我的档案：</strong>你主动点击"保存当前"时，排盘输入参数（生辰、性别、出生地等）会存于本机，便于随时切换、重新排盘。</li>
+    <li><strong>已购记录：</strong>你解锁付费章节后，购买凭证与已解锁章节标识会保存在本机，用于"我的已购 / 重新阅读"。</li>
+  </ul>
+  <p>以上数据<strong>仅存于你的设备</strong>，不会自动上传到我们的服务器。你可以使用浏览器自带的"清除站点数据 / 清除缓存"功能随时删除它们。</p>
+
+  <h2>四、数据留存期</h2>
+  <ul>
+    <li><strong>服务端缓存（data/cache）：</strong>排盘结果缓存保留 <strong>7 天</strong>，到期由系统策略自动清理。</li>
+    <li><strong>订单记录：</strong>仅用于交付与售后核对，按财务合规要求留存；如你需要删除，可依据第七节联系我们。</li>
+  </ul>
+
+  <h2>五、你如何删除自己的数据</h2>
+  <ul>
+    <li><strong>本机数据：</strong>在浏览器设置中清除本站点的"Cookie 与站点数据 / 本地存储"即可一次性删除档案与已购记录。</li>
+    <li><strong>服务端缓存：</strong>缓存不含可识别身份的信息，且 7 天后自动过期；如需立即删除特定缓存或订单记录，请通过第七节邮箱联系我们，并提供相关事实包 ID（factPackId）。</li>
+  </ul>
+
+  <h2>六、我们不使用第三方追踪与广告</h2>
+  <p>本产品<strong>不接入任何第三方统计、广告或用户行为追踪 SDK</strong>（不含友盟、神策、Google Analytics、Meta Pixel 等），也不向第三方出售或共享你的数据。页面与接口通信仅限于本产品自身服务。</p>
+
+  <h2>七、未成年人与联系我们</h2>
+  <p><strong>未成年人使用建议：</strong>本产品内容面向成年用户作文化与自我探索参考。未成年人请在监护人陪同下使用；涉及付费的内容，须征得监护人同意并由监护人代为操作与支付。</p>
+  <p>如需删除数据、索取副本或咨询本政策，请通过以下邮箱联系：<br>
+  <strong style="color:var(--ink)">support@example.com</strong>（占位邮箱，<span style="color:var(--red)">上线前须替换为真实客服邮箱</span>）。</p>
+
+  <p class="updated">本政策为上线前草案，最终以正式发布版本为准。</p>
+</main>
+
+<footer class="foot">
+  <div style="margin-bottom:8px">
+    <a href="privacy.html" style="color:var(--gold-ink);text-decoration:none;margin:0 6px">隐私政策</a>·
+    <a href="terms.html" style="color:var(--gold-ink);text-decoration:none;margin:0 6px">用户协议</a>·
+    <a href="refund.html" style="color:var(--gold-ink);text-decoration:none;margin:0 6px">退款说明</a>·
+    <a href="terms.html#disclaimer" style="color:var(--gold-ink);text-decoration:none;margin:0 6px">免责声明</a>
+  </div>
+  本产品内容属传统文化参考，不构成医疗、投资、法律或任何决策建议
+</footer>
+
+</body>
+</html>

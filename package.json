@@ -1,0 +1,17 @@
+{
+  "name": "mingli-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "命理内容产品原型：确定性排盘引擎 + 本地解读引擎 + 合规网关 + 报告渲染（零第三方依赖）",
+  "main": "src/server/index.js",
+  "scripts": {
+    "start": "node src/server/index.js",
+    "test": "node tests/run.js",
+    "smoke": "node tests/smoke.js",
+    "check": "node tests/run.js && node tests/smoke.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

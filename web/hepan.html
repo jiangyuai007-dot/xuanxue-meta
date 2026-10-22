@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>八字合盘 · 玄机</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="fonts/subset.css">
+</head>
+<body data-sys="hepan">
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">玄</span>
+    <div class="brand-txt">
+      <strong>玄机</strong>
+      <em>东方命理内容平台</em>
+    </div>
+  </div>
+  <nav class="tabs">
+    <a class="tab" href="bazi.html">八字</a>
+    <a class="tab" href="liuyao.html">六爻</a>
+    <a class="tab" href="qimen.html">奇门</a>
+    <a class="tab" href="ziwei.html">紫微</a>
+    <a class="tab active" href="hepan.html">合盘</a>
+    <a class="tab" href="mine.html">我的</a>
+  </nav>
+  <div class="top-status">
+    <span class="dot" id="svcDot"></span><span id="svcTxt">本地服务</span>
+  </div>
+
+</header>
+<main id="main" tabindex="-1">
+
+<div id="svcBanner" class="svc-banner" style="display:none"></div>
+
+<!-- 合盘起卦卡：双栏，甲乙双方各一套 -->
+<section class="formbar">
+  <div class="fb-card">
+    <div class="hp-form">
+      <div class="hp-party" data-party="a">
+        <div class="hp-party-h"><b>甲方</b><input aria-label="甲方姓名（可留空）" id="aName" class="hp-name" maxlength="8" placeholder="甲方（可留空）"></div>
+        <div class="fb-fields">
+          <div class="fb-row">
+        <label for="aGender">性别</label>
+        <div class="fb-ctl"><select aria-label="甲方性别" id="aGender"><option value="male">男命</option><option value="female">女命</option></select></div></div>
+          <div class="fb-row">
+        <label for="aCalendar">历法</label>
+        <div class="fb-ctl"><select aria-label="甲方历法" id="aCalendar"><option value="gregorian">公历</option><option value="lunar">农历</option></select>
+            <label class="leap" id="aLeapWrap" style="display:none"><input aria-label="甲方案例是否闰月" type="checkbox" id="aIsLeap"> 闰月</label>
+          </div></div>
+          <div class="fb-row"><label id="lb3">出生时间</label><div role="group" aria-labelledby="lb3" class="fb-ctl date-grid">
+            <input aria-label="a甲方出生年" type="number" id="aYear" value="1990" min="1900" max="2100"><span>年</span>
+            <input aria-label="a甲方出生月" type="number" id="aMonth" value="5" min="1" max="12"><span>月</span>
+            <input aria-label="a甲方出生日" type="number" id="aDay" value="20" min="1" max="31"><span>日</span>
+            <input aria-label="a甲方出生时" type="number" id="aHour" value="10" min="0" max="23"><span>时</span>
+            <input aria-label="a甲方出生分" type="number" id="aMinute" value="30" min="0" max="59"><span>分</span>
+          </div></div>
+          <div class="fb-row">
+        <label for="aCity">出生地</label>
+        <div class="fb-ctl"><select aria-label="甲方出生地" id="aCity"><option value="北京">北京</option></select></div></div>
+          <div class="fb-row"><label id="lb5">时间校正</label><div role="group" aria-labelledby="lb5" class="fb-ctl"><label class="chk"><input aria-label="真太阳时校正（甲方）" type="checkbox" id="aSolar"> 真太阳时</label></div></div>
+        </div>
+      </div>
+
+      <div class="hp-mid">
+        <div class="hp-mid-t">×<br>合</div>
+        <div class="hp-mid-note">选填昵称<br>只作标注</div>
+      </div>
+
+      <div class="hp-party" data-party="b">
+        <div class="hp-party-h"><b>乙方</b><input aria-label="乙方姓名（可留空）" id="bName" class="hp-name" maxlength="8" placeholder="乙方（可留空）"></div>
+        <div class="fb-fields">
+          <div class="fb-row">
+            <label for="bGender">性别</label>
+            <div class="fb-ctl"><select aria-label="乙方性别" id="bGender"><option value="female">女命</option><option value="male">男命</option></select></div>
+          </div>
+          <div class="fb-row">
+            <label for="bCalendar">历法</label>
+            <div class="fb-ctl"><select aria-label="乙方历法" id="bCalendar"><option value="gregorian">公历</option><option value="lunar">农历</option></select>
+              <label class="leap" id="bLeapWrap" style="display:none"><input aria-label="乙方案例是否闰月" type="checkbox" id="bIsLeap"> 闰月</label>
+            </div>
+          </div>
+          <div class="fb-row"><label id="lb8">出生时间</label><div role="group" aria-labelledby="lb8" class="fb-ctl date-grid">
+            <input aria-label="b乙方出生年" type="number" id="bYear" value="1993" min="1900" max="2100"><span>年</span>
+            <input aria-label="b乙方出生月" type="number" id="bMonth" value="3" min="1" max="12"><span>月</span>
+            <input aria-label="b乙方出生日" type="number" id="bDay" value="8" min="1" max="31"><span>日</span>
+            <input aria-label="b乙方出生时" type="number" id="bHour" value="14" min="0" max="23"><span>时</span>
+            <input aria-label="b乙方出生分" type="number" id="bMinute" value="20" min="0" max="59"><span>分</span>
+          </div></div>
+          <div class="fb-row"><label for="bCity">出生地</label><div class="fb-ctl"><select aria-label="乙方出生地" id="bCity"><option value="上海">上海</option></select></div></div>
+          <div class="fb-row"><label id="lb9">时间校正</label><div role="group" aria-labelledby="lb9" class="fb-ctl"><label class="chk"><input aria-label="真太阳时校正（乙方）" type="checkbox" id="bSolar"> 真太阳时</label></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fb-actions">
+      <span class="act-label">操作</span>
+      <div class="act-row act-row-main">
+        <button id="btnPaipan" class="primary">合盘</button>
+        <button id="btnReport">完整报告</button>
+      </div>
+      <div class="act-row act-row-aux">
+        <button id="btnHtml" disabled>报告页</button>
+        <button id="btnCard" disabled>分享卡</button>
+        <button id="btnSaveReport" disabled>保存到我的报告</button>
+      </div>
+    </div>
+    <div class="fb-hint" aria-live="polite" id="sysHint">双方各填一次生辰 → 本地推演跨盘干支关系 → 生成契合指数与六章解读</div>
+    <div class="fb-hint" aria-live="polite" style="color:var(--gold-ink)">未成年人请在监护人陪同下使用，付费内容需监护人同意。</div>
+  </div>
+  <div id="msg" aria-live="polite" class="msg"></div>
+</section>
+
+<!-- 三区工作台 -->
+<div class="workbench">
+
+  <aside class="rail rail-left">
+    <div class="rail-head"><h3>最近合盘</h3><button id="btnClearPairs" class="mini">清空</button></div>
+    <div id="pairList" class="profile-list"></div>
+    <p class="rail-note">排盘后会记录双方生辰（仅存本机浏览器），可随时一键重排。</p>
+  </aside>
+
+  <section class="stage">
+    <div id="resultHead" class="result-head" style="display:none"></div>
+
+    <div id="intro" class="intro">
+      <div class="intro-ic">☯</div>
+      <h3>八字合盘</h3>
+      <p>填写双方出生信息后点击「合盘」，跨盘干支关系、契合指数与六章解读将在此呈现。</p>
+      <div class="intro-tips">
+        <span>天干五合</span><span>地支六合</span><span>日柱夫妻宫</span><span>五行互补</span><span>刑冲害破</span>
+      </div>
+    </div>
+
+    <div id="chart" class="chart-stage" style="display:none"></div>
+    <div id="warnings" class="warn" style="display:none"></div>
+    <!-- AI 报告章节卡：服务端逐章推送，版式由渲染层写死（.rp-* 样式从 /api/report/css 载入） -->
+    <div id="reportBody" class="rp-host" style="display:none"></div>
+  </section>
+
+  <aside class="rail rail-right">
+    <div class="rail-head"><h3>解读报告</h3><span class="rail-sub" id="reportSrc"></span></div>
+    <div id="sections" class="sections"></div>
+    <div id="sku" class="sku-box" style="display:none">
+      <h4>解锁完整内容</h4>
+      <div id="skuList"></div>
+    </div>
+    <p class="rail-empty" id="railEmpty">点「完整报告」后，章节将在正文区逐章生成并即时展开。</p>
+  </aside>
+
+</div>
+</main>
+
+<footer class="foot">
+  <div style="margin-bottom:8px">
+    <a href="privacy.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">隐私政策</a>·
+    <a href="terms.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">用户协议</a>·
+    <a href="refund.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">退款说明</a>·
+    <a href="terms.html#disclaimer" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">免责声明</a>
+  </div>
+  本产品内容属传统文化参考，不构成医疗、投资、法律或任何决策建议
+</footer>
+
+<script src="cloud-history.js?v=20261006a"></script>
+<script src="hepan-drill.js?v=20261005"></script>
+</body>
+</html>

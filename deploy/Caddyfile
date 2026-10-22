@@ -1,0 +1,19 @@
+# xuanxue-meta Caddy 配置
+# 用法：把 example.com 改成你的域名，放到 /etc/caddy/Caddyfile，然后
+#   sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
+# Caddy 自动申请并续期 Let's Encrypt 证书；80 端口只需留给 ACME 校验。
+
+example.com {
+    # 压缩（应用自身已按 Accept-Encoding 做 gzip，这里再兜一层 zstd）
+    encode zstd gzip
+
+    reverse_proxy 127.0.0.1:8787 {
+        # SSE 逐章推送：立即刷新不缓冲，长连接（报告生成 40s+）不被掐
+        flush_interval -1
+    }
+
+    header {
+        # 不暴露反代服务器标识（应用自身的安全响应头已在代码里）
+        -Server
+    }
+}

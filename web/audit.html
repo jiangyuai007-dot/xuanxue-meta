@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AUDIT</title>
+<style>
+  body{margin:0;font:12px/1.5 monospace;background:#111;color:#eee}
+  iframe{display:block;width:100%;height:600px;border:0}
+  #result{white-space:pre;padding:10px}
+  .bad{color:#f66}
+  .ok{color:#6f6}
+</style>
+</head>
+<body>
+<div id="result">PENDING</div>
+<div id="frames"></div>
+<script>
+(function(){
+  const PAGES = ['bazi.html','liuyao.html','qimen.html','ziwei.html','index.html'];
+  const framesEl = document.getElementById('frames');
+  const resultEl = document.getElementById('result');
+  const out = [];
+  let done = 0;
+
+  function summarize(page, doc){
+    const de = doc.documentElement;
+    const cw = de.clientWidth, sw = de.scrollWidth;
+    const overflow = sw - cw;
+    const bad = [];
+    if (doc.body){
+      doc.body.querySelectorAll('*').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.right > cw + 1){
+          const cls = (typeof el.className === 'string' ? el.className : '').slice(0,40);
+          bad.push(el.tagName.toLowerCase() + (cls ? '.' + cls.split(/\s+/).join('.') : '') + ' r=' + Math.round(r.right));
+        }
+      });
+    }
+    // 触控目标过小（可点击且高度 < 32px）
+    let smallTap = 0;
+    if (doc.body){
+      doc.body.querySelectorAll('button,select,input,a.btn,[role=button]').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0 && r.height < 32) smallTap += 1;
+      });
+    }
+    return { page, cw, sw, overflow, smallTap, bad: bad.slice(0, 15) };
+  }
+
+  PAGES.forEach((p, i) => {
+    const f = document.createElement('iframe');
+    f.src = '/' + p + '?audit=1&t=' + Date.now();
+    f.style.height = '700px';
+    framesEl.appendChild(f);
+    const finish = () => {
+      try {
+        out.push(summarize(p, f.contentDocument));
+      } catch(e){
+        out.push({ page: p, error: String(e) });
+      }
+      done += 1;
+      if (done === PAGES.length){
+        const worst = out.reduce((a,b)=>Math.max(a, b.overflow||0), 0);
+        resultEl.textContent = 'AUDIT_WORST_OVERFLOW=' + worst + '\n' + JSON.stringify(out, null, 1);
+        document.title = worst > 0 ? 'AUDIT_FAIL' : 'AUDIT_OK';
+      }
+    };
+    f.onload = () => setTimeout(finish, 700);
+    f.onerror = () => { out.push({page:p, error:'iframe load error'}); done+=1; };
+  });
+})();
+</script>
+</body>
+</html>

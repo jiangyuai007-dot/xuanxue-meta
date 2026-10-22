@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>八字排盘 · 玄机</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="fonts/subset.css">
+</head>
+<body data-sys="bazi">
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">玄</span>
+    <div class="brand-txt">
+      <strong>玄机</strong>
+      <em>东方命理内容平台</em>
+    </div>
+  </div>
+  <nav class="tabs">
+    <a class="tab active" href="bazi.html">八字</a>
+    <a class="tab" href="liuyao.html">六爻</a>
+    <a class="tab" href="qimen.html">奇门</a>
+    <a class="tab" href="ziwei.html">紫微</a>
+    <a class="tab" href="hepan.html">合盘</a>
+    <a class="tab" href="mine.html">我的</a>
+  </nav>
+  <div class="top-status">
+    <span class="dot" id="svcDot"></span><span id="svcTxt">本地服务</span>
+  </div>
+
+</header>
+<main id="main" tabindex="-1">
+
+<div id="svcBanner" class="svc-banner" style="display:none"></div>
+
+<!-- 八字起卦卡 -->
+<section class="formbar">
+  <div class="fb-card">
+    <div class="fb-fields">
+      <div class="fb-row">
+        <label for="gender">性别</label>
+        <div class="fb-ctl"><select aria-label="性别" id="gender"><option value="male">男命</option><option value="female">女命</option></select>
+        </div>
+      </div>
+
+      <div class="fb-row">
+        <label for="calendar">历法</label>
+        <div class="fb-ctl">
+            <select aria-label="历法" id="calendar">
+            <option value="gregorian">公历</option>
+            <option value="lunar">农历</option>
+          </select>
+          <label class="leap" id="leap-wrap" style="display:none"><input aria-label="闰月" type="checkbox" id="isLeap"> 闰月</label>
+        </div>
+      </div>
+
+      <div class="fb-row" id="row-datetime">
+        <label id="lb3">出生时间</label>
+        <div role="group" aria-labelledby="lb3" class="fb-ctl date-grid">
+          <input aria-label="出生年" type="number" id="year" value="1990" min="1900" max="2100"><span>年</span>
+          <input aria-label="出生月" type="number" id="month" value="5" min="1" max="12"><span>月</span>
+          <input aria-label="出生日" type="number" id="day" value="20" min="1" max="31"><span>日</span>
+          <input aria-label="出生时" type="number" id="hour" value="14" min="0" max="23"><span>时</span>
+          <input aria-label="出生分" type="number" id="minute" value="30" min="0" max="59"><span>分</span>
+        </div>
+      </div>
+
+      <div class="fb-row" id="row-place">
+        <label for="city">出生地</label>
+        <div class="fb-ctl">
+          <select aria-label="出生地" id="city"><option value="北京">北京</option></select>
+        </div>
+      </div>
+
+      <div class="fb-row">
+        <label id="lb4">时间校正</label>
+        <div role="group" aria-labelledby="lb4" class="fb-ctl">
+          <label class="chk"><input aria-label="真太阳时校正" type="checkbox" id="useSolar"> 真太阳时</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="fb-actions">
+      <span class="act-label">操作</span>
+      <div class="act-row act-row-main">
+        <button id="btnPaipan" class="primary">排盘</button>
+        <button id="btnReport">完整报告</button>
+      </div>
+      <div class="act-row act-row-aux">
+        <button id="btnHtml" disabled>报告页</button>
+        <button id="btnCard" disabled>分享卡</button>
+        <button id="btnSaveReport" disabled>保存到我的报告</button>
+      </div>
+    </div>
+    <div class="fb-hint" aria-live="polite" id="sysHint">公历/农历输入 · 真太阳时校正 · 四柱、大运流年、神煞、称骨</div>
+    <div class="fb-hint" aria-live="polite" style="color:var(--gold-ink)">未成年人请在监护人陪同下使用，付费内容需监护人同意。</div>
+  </div>
+  <div id="msg" aria-live="polite" class="msg"></div>
+</section>
+
+<!-- 三区工作台 -->
+<div class="workbench">
+
+  <aside class="rail rail-left">
+    <div class="rail-head">
+      <h3>我的档案</h3>
+      <button id="btnSaveProfile" class="mini">保存当前</button>
+    </div>
+    <div id="profileList" class="profile-list"></div>
+    <p class="rail-note">排盘后点「保存当前」，档案存于本机浏览器，可随时切换重排。</p>
+  </aside>
+
+  <section class="stage">
+    <div id="resultHead" class="result-head" style="display:none"></div>
+
+    <div id="intro" class="intro">
+      <div class="intro-ic">☯</div>
+      <h3>八字排盘</h3>
+      <p>填写出生信息后点击「排盘」，四柱、大运流年、神煞与称骨将在此呈现。</p>
+      <div class="intro-tips">
+        <span>四柱十神</span><span>大运流年</span><span>神煞</span><span>称骨</span>
+      </div>
+    </div>
+
+    <div id="chart" class="chart-stage" style="display:none"></div>
+    <div id="warnings" class="warn" style="display:none"></div>
+    <!-- AI 报告章节卡：服务端逐章推送，版式由渲染层写死（.rp-* 样式从 /api/report/css 载入） -->
+    <div id="reportBody" class="rp-host" style="display:none"></div>
+  </section>
+
+  <aside class="rail rail-right">
+    <div class="rail-head"><h3>解读报告</h3><span class="rail-sub" id="reportSrc"></span></div>
+    <div id="sections" class="sections"></div>
+    <div id="sku" class="sku-box" style="display:none">
+      <h4>解锁完整内容</h4>
+      <div id="skuList"></div>
+    </div>
+    <p class="rail-empty" id="railEmpty">点「完整报告」后，章节将在正文区逐章生成并即时展开。</p>
+  </aside>
+
+</div>
+</main>
+
+<footer class="foot">
+  <div style="margin-bottom:8px">
+    <a href="privacy.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">隐私政策</a>·
+    <a href="terms.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">用户协议</a>·
+    <a href="refund.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">退款说明</a>·
+    <a href="terms.html#disclaimer" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">免责声明</a>
+  </div>
+  本产品内容属传统文化参考，不构成医疗、投资、法律或任何决策建议
+</footer>
+
+<script src="bazi-drill.js?v=20260927d"></script>
+<script src="cloud-history.js?v=20261006a"></script>
+<script src="app.js?v=20260927d"></script>
+</body>
+</html>

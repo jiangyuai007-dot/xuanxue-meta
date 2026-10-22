@@ -1,0 +1,31 @@
+# —— 运行时数据（含用户数据 / 订单 / 签名密钥 .secret，绝不可入库）——
+/data/
+
+# —— 本地 Chrome 配置（CDP 探针专用，体积大）——
+.chrome-profile/
+
+# —— 根目录一次性探针 / 调试产物（隐藏文件整类忽略，.gitignore 本身取回）——
+/.*
+!.gitignore
+!.gitattributes
+!.gitmodules
+
+# —— 截图 / 预览产物（本地用，不入库）——
+/shots/
+
+# —— 日志 ——
+*.log
+
+# —— 临时探针脚本 / 中间产物（保留 scripts/ 下正式脚本）——
+scripts/tmp_*
+.probe*
+.c3*
+.dbg*
+.walk*
+.report_*.md
+.audit.json
+
+# —— 系统 / 编辑器 ——
+.DS_Store
+Thumbs.db
+node_modules/

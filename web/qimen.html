@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>奇门遁甲 · 玄机</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="fonts/subset.css">
+</head>
+<body data-sys="qimen">
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">玄</span>
+    <div class="brand-txt">
+      <strong>玄机</strong>
+      <em>东方命理内容平台</em>
+    </div>
+  </div>
+  <nav class="tabs">
+    <a class="tab" href="bazi.html">八字</a>
+    <a class="tab" href="liuyao.html">六爻</a>
+    <a class="tab active" href="qimen.html">奇门</a>
+    <a class="tab" href="ziwei.html">紫微</a>
+    <a class="tab" href="hepan.html">合盘</a>
+    <a class="tab" href="mine.html">我的</a>
+  </nav>
+  <div class="top-status">
+    <span class="dot" id="svcDot"></span><span id="svcTxt">本地服务</span>
+  </div>
+
+</header>
+<main id="main" tabindex="-1">
+
+<div id="svcBanner" class="svc-banner" style="display:none"></div>
+
+<!-- 奇门起卦卡 -->
+<section class="formbar">
+  <div class="fb-card">
+    <div class="fb-fields">
+      <div class="fb-row" id="row-datetime">
+        <label id="lb1">起局时间</label>
+        <div role="group" aria-labelledby="lb1" class="fb-ctl date-grid">
+          <input aria-label="起局年" type="number" id="year" min="1900" max="2100"><span>年</span>
+          <input aria-label="起局月" type="number" id="month" min="1" max="12"><span>月</span>
+          <input aria-label="起局日" type="number" id="day" min="1" max="31"><span>日</span>
+          <input aria-label="起局时" type="number" id="hour" min="0" max="23"><span>时</span>
+          <input aria-label="起局分" type="number" id="minute" min="0" max="59"><span>分</span>
+        </div>
+      </div>
+
+      <div class="fb-row">
+        <label for="purpose">所测事由</label>
+        <div class="fb-ctl"><select aria-label="所测事由" id="purpose">
+            <option value="general">通用</option>
+            <option value="wealth">求财</option>
+            <option value="career">事业谋职</option>
+            <option value="travel">出行</option>
+            <option value="negotiate">谈判合作</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fb-row">
+        <label for="juMethod">起局方式</label>
+        <div class="fb-ctl"><select aria-label="起局方式" id="juMethod">
+            <option value="chaibu">拆补法</option>
+            <option value="zhirun">置闰法</option>
+            <option value="maoshan">茅山法</option>
+            <option value="custom">自选局数</option>
+          </select>
+          <span id="customJuWrap" style="display:none">
+            <select aria-label="自定义局数" id="customJu" style="width:86px">
+              <option value="1">1 局</option><option value="2">2 局</option><option value="3">3 局</option>
+              <option value="4">4 局</option><option value="5">5 局</option><option value="6">6 局</option>
+              <option value="7">7 局</option><option value="8">8 局</option><option value="9">9 局</option>
+            </select>
+          </span>
+        </div>
+      </div>
+
+      <div class="fb-row">
+        <label for="panType">盘式 / 寄宫</label>
+        <div class="fb-ctl"><select aria-label="盘式与寄宫" id="panType">
+            <option value="zhuan">转盘</option>
+            <option value="fei">飞盘（暂按转盘）</option>
+          </select>
+          <select aria-label="寄宫宫位" id="jiGong">
+            <option value="kun2">寄坤二宫</option>
+            <option value="yangGenYinKun">阳艮八 · 阴坤二</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fb-row">
+        <label id="lb5">时间校正</label>
+        <div role="group" aria-labelledby="lb5" class="fb-ctl">
+          <label class="chk"><input aria-label="真太阳时校正" type="checkbox" id="useSolar"> 真太阳时</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="fb-actions">
+      <span class="act-label">操作</span>
+      <div class="act-row act-row-main">
+        <button id="btnPaipan" class="primary">起局排盘</button>
+        <button id="btnReport">完整报告</button>
+      </div>
+      <div class="act-row act-row-aux">
+        <button id="btnHtml" disabled>报告页</button>
+        <button id="btnCard" disabled>分享卡</button>
+        <button id="btnSaveReport" disabled>保存到我的报告</button>
+      </div>
+    </div>
+    <div class="fb-hint" aria-live="polite" id="sysHint">时家奇门 · 转盘 · 拆补法 · 九宫格局、值符值使、四害标记可点击解释</div>
+    <div class="fb-hint" aria-live="polite" style="color:var(--gold-ink)">未成年人请在监护人陪同下使用，付费内容需监护人同意。</div>
+  </div>
+  <div id="msg" aria-live="polite" class="msg"></div>
+</section>
+
+<div class="workbench">
+
+  <aside class="rail rail-left">
+    <div class="rail-head">
+      <h3>我的档案</h3>
+      <button id="btnSaveProfile" class="mini">保存当前</button>
+    </div>
+    <div id="profileList" class="profile-list"></div>
+    <p class="rail-note">起局后点「保存当前」，局例存于本机浏览器，可随时重放。</p>
+  </aside>
+
+  <section class="stage">
+    <div id="resultHead" class="result-head" style="display:none"></div>
+
+    <div id="intro" class="intro">
+      <div class="intro-ic">☷</div>
+      <h3>奇门遁甲</h3>
+      <p>选择时间与事由后点击「起局排盘」，九宫格局、值符值使、吉凶方位将在此呈现。</p>
+      <div class="intro-tips">
+        <span>九宫排布</span><span>值符值使</span><span>八门九星</span><span>吉凶方位</span>
+      </div>
+    </div>
+
+    <div id="chart" class="chart-stage" style="display:none"></div>
+    <div id="warnings" class="warn" style="display:none"></div>
+  </section>
+
+  <aside class="rail rail-right">
+    <div class="rail-head"><h3>解读报告</h3><span class="rail-sub" id="reportSrc"></span></div>
+    <div id="sections" class="sections"></div>
+    <div id="sku" class="sku-box" style="display:none">
+      <h4>解锁完整内容</h4>
+      <div id="skuList"></div>
+    </div>
+    <p class="rail-empty" id="railEmpty">生成报告后，解读章节在此逐条展开。</p>
+  </aside>
+
+</div>
+</main>
+
+<footer class="foot">
+  <div style="margin-bottom:8px">
+    <a href="privacy.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">隐私政策</a>·
+    <a href="terms.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">用户协议</a>·
+    <a href="refund.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">退款说明</a>·
+    <a href="terms.html#disclaimer" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">免责声明</a>
+  </div>
+  本产品内容属传统文化参考，不构成医疗、投资、法律或任何决策建议
+</footer>
+
+<script src="bazi-drill.js?v=20260927d"></script>
+<script src="cloud-history.js?v=20261006a"></script>
+<script src="app.js?v=20260927d"></script>
+</body>
+</html>

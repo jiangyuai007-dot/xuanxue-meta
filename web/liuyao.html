@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>六爻占卜 · 玄机</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="fonts/subset.css">
+</head>
+<body data-sys="liuyao">
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">玄</span>
+    <div class="brand-txt">
+      <strong>玄机</strong>
+      <em>东方命理内容平台</em>
+    </div>
+  </div>
+  <nav class="tabs">
+    <a class="tab" href="bazi.html">八字</a>
+    <a class="tab active" href="liuyao.html">六爻</a>
+    <a class="tab" href="qimen.html">奇门</a>
+    <a class="tab" href="ziwei.html">紫微</a>
+    <a class="tab" href="hepan.html">合盘</a>
+    <a class="tab" href="mine.html">我的</a>
+  </nav>
+  <div class="top-status">
+    <span class="dot" id="svcDot"></span><span id="svcTxt">本地服务</span>
+  </div>
+
+</header>
+<main id="main" tabindex="-1">
+
+<div id="svcBanner" class="svc-banner" style="display:none"></div>
+
+<!-- 六爻起卦卡 -->
+<section class="formbar">
+  <div class="fb-card">
+    <div class="fb-fields">
+      <div class="fb-row" id="row-method">
+        <label id="lb1">起卦方式</label>
+        <div role="group" aria-labelledby="lb1" class="fb-ctl" style="display:block">
+          <div class="seg" id="methodSeg">
+            <button type="button" data-v="time" class="on">时间起卦</button>
+            <button type="button" data-v="number">两数起卦</button>
+            <button type="button" data-v="number2">三数起卦</button>
+            <button type="button" data-v="coin">在线摇卦</button>
+            <button type="button" data-v="manual">手动指定</button>
+            <button type="button" data-v="name">卦名起卦</button>
+            <button type="button" data-v="auto">自动起卦</button>
+          </div>
+          <select aria-label="起卦方式" id="method" style="display:none">
+            <option value="time">时间起卦</option>
+            <option value="number">数字起卦1（两数）</option>
+            <option value="number2">数字起卦2（三数）</option>
+            <option value="coin">在线摇卦</option>
+            <option value="manual">手动指定</option>
+            <option value="name">卦名起卦</option>
+            <option value="auto">自动起卦</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fb-row" id="row-datetime">
+        <label id="lb2">起卦时间</label>
+        <div role="group" aria-labelledby="lb2" class="fb-ctl date-grid">
+          <input aria-label="起卦年" type="number" id="year" min="1900" max="2100"><span>年</span>
+          <input aria-label="起卦月" type="number" id="month" min="1" max="12"><span>月</span>
+          <input aria-label="起卦日" type="number" id="day" min="1" max="31"><span>日</span>
+          <input aria-label="起卦时" type="number" id="hour" min="0" max="23"><span>时</span>
+          <input aria-label="起卦分" type="number" id="minute" min="0" max="59"><span>分</span>
+        </div>
+      </div>
+
+      <div class="fb-row" id="row-liuyao" style="display:none">
+        <label id="methodCtxLabel">起卦参数</label>
+        <div role="group" aria-labelledby="methodCtxLabel" class="fb-ctl fb-ctl-block">
+          <span id="numWrap" style="display:none" class="num-wrap">
+            <input aria-label="上卦数" type="number" id="n1" value="23" min="0" placeholder="上卦数"><span class="num-x">、</span>
+            <input aria-label="下卦数" type="number" id="n2" value="88" min="0" placeholder="下卦数">
+          </span>
+
+          <span id="numWrap2" style="display:none" class="num-wrap">
+            <input aria-label="上卦数" type="number" id="m1" value="6" min="0" placeholder="上卦数"><span class="num-x">、</span>
+            <input aria-label="下卦数" type="number" id="m2" value="7" min="0" placeholder="下卦数"><span class="num-x">、</span>
+            <input aria-label="参动数" type="number" id="m3" value="8" min="0" placeholder="参动数">
+          </span>
+
+          <span id="coinWrap" style="display:none" class="coin-wrap">
+            <div class="coins" id="coinCoins" title="点击铜钱摇出一爻">
+              <span class="coin"><i>字</i><i>背</i></span>
+              <span class="coin"><i>字</i><i>背</i></span>
+              <span class="coin"><i>字</i><i>背</i></span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div class="coin-status" id="coinStatus">集中精神默想所占之事，点击铜钱开始摇卦（共六爻，由下而上）</div>
+              <div class="coin-lines" id="coinLines"></div>
+              <div><button type="button" id="btnCoinReset" class="mini" style="display:none">重新摇卦</button></div>
+            </div>
+          </span>
+
+          <span id="manualWrap" style="display:none" class="manual-wrap">
+            <div id="manualYaos" class="manual-yaos"></div>
+            <span class="fb-tip">点每爻循环切换：少阳（静）→ 老阳（动·○）→ 少阴（静）→ 老阴（动·×）</span>
+          </span>
+
+          <span id="nameWrap" style="display:none" class="name-wrap">
+            <select aria-label="卦名" id="guaName"></select>
+          </span>
+
+          <span class="fb-tip" id="methodTip">以当前时间起卦，可修改上方时间</span>
+        </div>
+      </div>
+
+      <div class="fb-row">
+        <label for="question">所问事项</label>
+        <div class="fb-ctl">
+          <input type="text" id="question" placeholder="例如：今年是否适合换工作">
+          <select aria-label="事项分类" id="category">
+            <option value="general">通用</option>
+            <option value="career">事业</option>
+            <option value="wealth">财运</option>
+            <option value="relationship">感情</option>
+            <option value="study">学业</option>
+            <option value="health">健康</option>
+            <option value="travel">出行</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="fb-actions">
+      <span class="act-label">操作</span>
+      <div class="act-row act-row-main">
+        <button id="btnPaipan" class="primary">起卦排盘</button>
+        <button id="btnReport">完整报告</button>
+      </div>
+      <div class="act-row act-row-aux">
+        <button id="btnHtml" disabled>报告页</button>
+        <button id="btnCard" disabled>分享卡</button>
+        <button id="btnSaveReport" disabled>保存到我的报告</button>
+      </div>
+    </div>
+    <div class="fb-hint" aria-live="polite" id="sysHint">时间 / 数字 / 铜钱 / 手动 / 卦名起卦 · 本卦变卦 · 世应伏神动爻六亲</div>
+    <div class="fb-hint" aria-live="polite" style="color:var(--gold-ink)">未成年人请在监护人陪同下使用，付费内容需监护人同意。</div>
+  </div>
+  <div id="msg" aria-live="polite" class="msg"></div>
+</section>
+
+<div class="workbench">
+
+  <aside class="rail rail-left">
+    <div class="rail-head">
+      <h3>我的档案</h3>
+      <button id="btnSaveProfile" class="mini">保存当前</button>
+    </div>
+    <div id="profileList" class="profile-list"></div>
+    <p class="rail-note">起卦后点「保存当前」，卦例存于本机浏览器，可随时重放。</p>
+  </aside>
+
+  <section class="stage">
+    <div id="resultHead" class="result-head" style="display:none"></div>
+
+    <div id="intro" class="intro">
+      <div class="intro-ic">䷀</div>
+      <h3>六爻占卜</h3>
+      <p>选择起卦方式后点击「起卦排盘」，本卦、变卦、动爻、伏神、六亲、世应将在此完整呈现。</p>
+      <div class="intro-tips">
+        <span>纳甲装卦</span><span>世应六亲</span><span>动爻伏神</span><span>六神卦身</span>
+      </div>
+    </div>
+
+    <div id="chart" class="chart-stage" style="display:none"></div>
+    <div id="warnings" class="warn" style="display:none"></div>
+  </section>
+
+  <aside class="rail rail-right">
+    <div class="rail-head"><h3>解读报告</h3><span class="rail-sub" id="reportSrc"></span></div>
+    <div id="sections" class="sections"></div>
+    <div id="sku" class="sku-box" style="display:none">
+      <h4>解锁完整内容</h4>
+      <div id="skuList"></div>
+    </div>
+    <p class="rail-empty" id="railEmpty">生成报告后，解读章节在此逐条展开。</p>
+  </aside>
+
+</div>
+</main>
+
+<footer class="foot">
+  <div style="margin-bottom:8px">
+    <a href="privacy.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">隐私政策</a>·
+    <a href="terms.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">用户协议</a>·
+    <a href="refund.html" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">退款说明</a>·
+    <a href="terms.html#disclaimer" style="color:var(--ink-2);text-decoration:underline;margin:0 6px">免责声明</a>
+  </div>
+  本产品内容属传统文化参考，不构成医疗、投资、法律或任何决策建议
+</footer>
+
+<script src="cloud-history.js?v=20261006a"></script>
+<script src="app.js?v=20260927d"></script>
+</body>
+</html>
