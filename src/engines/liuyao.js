@@ -10,7 +10,7 @@ import { toLunar } from '../core/lunar.js';
 import { GAN, ZHI, GAN_WUXING, ZHI_WUXING, ganzhiOfJdn, isSheng, isKe } from '../core/ganzhi.js';
 import { jdnToYmd } from '../core/julian.js';
 import { solarTerm, SOLAR_TERMS } from '../core/astro.js';
-import { MONTH_JIE, computePillars } from './bazi.js';
+import { MONTH_JIE, computePillars, normalizeInput } from './bazi.js';
 
 export const TRIGRAMS = ['乾', '兑', '离', '震', '巽', '坎', '艮', '坤'];
 /** 爻由下而上，1=阳 0=阴 */
@@ -341,7 +341,8 @@ const CATEGORY_YONGSHEN = {
  * 主入口
  */
 export function computeLiuyao(input) {
-  const dt = resolveDateTime(input);
+  const src = normalizeInput(input);
+  const dt = resolveDateTime(src);
   const lunar = toLunar(dt.jdUtc, dt.tzOffset);
   const dayNumber = Math.floor(dt.jdSolar + 0.5);
   const riGz = ganzhiOfJdn(dayNumber);

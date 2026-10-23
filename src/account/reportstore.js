@@ -13,16 +13,15 @@
  *  - 游客 → `did:<服务端下发的随机设备ID>`（httpOnly cookie），清 cookie 等于放弃历史，
  *    因此客户端会同时提示「登录可跨设备保存」。
  *
- * 落盘：data/reports.json（单进程单机形态；多实例前需换成共享存储）。
+ * 落盘：统一由 src/storage/db.js（支持 node:sqlite WAL 与 .tmp + renameSync 原子合并）管理 data/reports.json。
  * 治理：每个 owner 最多 200 条、超过 24 个月的记录整体清理，避免索引无限膨胀。
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { DATA_DIR, readCollection, writeCollection } from '../storage/db.js';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '../..');
-const DATA_DIR = path.join(ROOT, 'data');
 const FILE = path.join(DATA_DIR, 'reports.json');
 
 const PER_OWNER_MAX = 200;
@@ -30,22 +29,13 @@ const RETAIN_MS = 24 * 30 * 24 * 60 * 60 * 1000; // 24 个月
 const TOTAL_MAX = 20000;
 
 function loadAll() {
-  try {
-    const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-    if (raw && Array.isArray(raw.list)) return raw.list;
-  } catch {
-    /* 文件不存在或坏档 → 视作空库（坏档不阻塞启动） */
-  }
-  return [];
+  return readCollection('reports');
 }
 
-function saveAll(list) {
+function saveAll(list, opts = {}) {
   try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    // 先写临时文件再 rename：避免写一半被 kill 掉留下一份坏 json
-    const tmp = FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify({ v: 1, list }, null, 0), 'utf8');
-    fs.renameSync(tmp, FILE);
+    // 委托统一存储层执行原子写入（内部使用 .tmp 临时文件 + fs.renameSync 与 SQLite WAL 同步）
+    writeCollection('reports', list, opts);
   } catch (e) {
     /* 落盘失败不阻塞主流程（退化为「这次没存住」） */
     if (typeof console !== 'undefined') console.warn('[reportstore] 落盘失败：', e && e.message);
@@ -65,7 +55,6 @@ function newId() {
 export function saveReport({ owner, system, title = '', subtitle = '', payload }) {
   if (!owner || !system || payload === undefined) throw new Error('缺少 owner / system / payload');
   const list = loadAll();
-  const key = (r) => `${r.owner}|${r.system}|${JSON.stringify(r.payload)}`;
   const now = new Date().toISOString();
   const idx = list.findIndex((r) => r.owner === owner && r.system === system && JSON.stringify(r.payload) === JSON.stringify(payload));
   if (idx >= 0) {
@@ -105,7 +94,7 @@ export function saveReport({ owner, system, title = '', subtitle = '', payload }
     perOwner.set(r.owner, n);
     return n <= PER_OWNER_MAX;
   });
-  saveAll(pruned.slice(0, TOTAL_MAX));
+  saveAll(pruned.slice(0, TOTAL_MAX), { replaceAll: true });
   return { id: rec.id, createdAt: now, updatedAt: now, updated: false };
 }
 
@@ -143,7 +132,7 @@ export function removeReport(id, owner) {
   const list = loadAll();
   const hit = list.some((r) => r.id === id && r.owner === owner);
   if (!hit) return false;
-  saveAll(list.filter((r) => !(r.id === id && r.owner === owner)));
+  saveAll(list.filter((r) => !(r.id === id && r.owner === owner)), { deletedIds: [id] });
   return true;
 }
 

@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>六爻占卜 · 玄机</title>
+<meta name="theme-color" content="#241d14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="fonts/subset.css">
 </head>
@@ -173,6 +178,8 @@
     </div>
 
     <div id="chart" class="chart-stage" style="display:none"></div>
+    <!-- Phase 2 升级：六爻接入统一流式章节卡片容器 -->
+    <div id="reportBody" class="rp-host" style="display:none"></div>
     <div id="warnings" class="warn" style="display:none"></div>
   </section>
 
@@ -201,5 +208,6 @@
 
 <script src="cloud-history.js?v=20261006a"></script>
 <script src="app.js?v=20260927d"></script>
+<script src="poster.js?v=20261022"></script>
 </body>
 </html>

@@ -1,14 +1,11 @@
 /**
  * 服务端加固中间件（零第三方依赖）
  *  - 输入校验层（/api/paipan、/api/report 共用）
- *  - 安全响应头
+ *  - 安全响应头（含 PWA worker-src / manifest-src 与 Canvas 海报 blob:/data: 支持）
  *  - 按 IP+接口维度的令牌桶限流
  *  - gzip 判定与压缩辅助
  *  - 内存 reports 的 LRU 容器
  *  - 客户端真实 IP 提取（受信反代后才信任 X-Forwarded-For）
- *
- * 设计约束：所有面向用户的错误都必须是「用户可读中文 + 固定 code」，
- * 内部字段名 / 堆栈绝不外泄。
  */
 
 import zlib from 'node:zlib';
@@ -17,14 +14,12 @@ import { CITIES } from '../core/time.js';
 /* ----------------------------------------------------------------------- *
  * 1. 安全响应头
  * ----------------------------------------------------------------------- */
-// 页面含内联 <style>/<script>，故 script-src/style-src 允许 'unsafe-inline'；
-// 经实测（CDP 抓 console error）前端无 eval/new Function/外联资源，故不放开 'unsafe-eval'。
 export const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'SAMEORIGIN',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  "Content-Security-Policy":
-    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'",
+  'Content-Security-Policy':
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; worker-src 'self'; manifest-src 'self'; img-src 'self' data: blob:; connect-src 'self'",
 };
 
 /* ----------------------------------------------------------------------- *
@@ -51,8 +46,6 @@ function toInt(v) {
 
 /**
  * 校验 /api/paipan 与 /api/report 的入参。
- * @returns {{ok:true} | {ok:false, error:string}}
- * 失败信息均为用户可读中文；不返回任何内部字段名/堆栈。
  */
 export function validateInput(raw) {
   const input = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
@@ -77,7 +70,6 @@ export function validateInput(raw) {
   if (!Number.isFinite(day)) return { ok: false, error: '出生日期必须填写' };
   const cal = input.calendar || 'gregorian';
   if (cal === 'lunar') {
-    // 农历月最多 30 天（无 31 日）
     if (day < 1 || day > 30) return { ok: false, error: `农历 ${month} 月没有 ${day} 日` };
   } else {
     if (day < 1 || day > daysInGregorianMonth(year, month)) {
@@ -89,8 +81,6 @@ export function validateInput(raw) {
   if (!Number.isFinite(hour)) return { ok: false, error: '出生时辰必须填写' };
   if (hour < 0 || hour > 23) return { ok: false, error: '出生时辰需在 0~23 之间' };
 
-  // minute / calendar / city 等「可选但需合规」的字段：仅在校验出现时校验，未提供不强制
-  // （六爻 / 奇门既有调用不携带 minute、calendar，保持兼容）。
   if (input.minute !== undefined && input.minute !== null && input.minute !== '') {
     const minute = toInt(input.minute);
     if (!Number.isFinite(minute) || minute < 0 || minute > 59) return { ok: false, error: '分钟需在 0~59 之间' };
@@ -101,7 +91,6 @@ export function validateInput(raw) {
     }
   }
 
-  // 城市白名单：city 在 CITIES 内，或显式提供合法经纬度。两者皆无则明确报错（不静默兜底）。
   const cityOk = typeof input.city === 'string' && input.city.trim() !== '' && CITY_NAMES.has(input.city.trim());
   const hasLonLat = Number.isFinite(Number(input.lon)) && Number.isFinite(Number(input.lat));
   if (!cityOk && !hasLonLat) {
@@ -117,119 +106,95 @@ export function validateInput(raw) {
 /* ----------------------------------------------------------------------- *
  * 3. 限流：令牌桶，按 IP + 接口维度
  * ----------------------------------------------------------------------- */
-// 读接口（静态/GET）：每 IP 60 次/分钟；写接口（排盘/报告/下单）：每 IP 20 次/分钟。
-const RATE = {
-  read: { cap: 60, refillPerSec: 60 / 60 },
-  write: { cap: 20, refillPerSec: 20 / 60 },
-};
-const WRITE_PATHS = new Set([
-  '/api/paipan', '/api/report', '/api/report/stream',
-  '/api/hepan', '/api/hepan/report/stream',
-  '/api/order', '/api/reports',
-]);
-// 本地回环免限流，方便本地联调/验收。
-const WHITELIST = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const BUCKETS = new Map();
+const MAX_BUCKETS = 10000;
 
-const buckets = new Map();
-
-/** @returns {{ok:true, remaining:number} | {ok:false, retryAfter:number}} */
-export function rateLimit(ip, urlPath, method) {
-  if (WHITELIST.has(ip)) return { ok: true, remaining: Infinity };
-  const isWrite = WRITE_PATHS.has(urlPath);
-  const key = ip + '|' + (isWrite ? 'w' : 'r');
-  const cfg = isWrite ? RATE.write : RATE.read;
+export function rateLimit(ip, kind = 'read') {
   const now = Date.now();
-  let b = buckets.get(key);
+  const cap = kind === 'write' ? 20 : 60;
+  const refillPerMs = cap / 60000;
+  const key = `${ip}:${kind}`;
+
+  if (BUCKETS.size > MAX_BUCKETS) {
+    for (const [k, v] of BUCKETS) {
+      if (now - v.last > 120000) BUCKETS.delete(k);
+      if (BUCKETS.size <= MAX_BUCKETS / 2) break;
+    }
+  }
+
+  let b = BUCKETS.get(key);
   if (!b) {
-    b = { tokens: cfg.cap, ts: now };
-    buckets.set(key, b);
+    b = { tokens: cap, last: now };
+    BUCKETS.set(key, b);
+  } else {
+    b.tokens = Math.min(cap, b.tokens + (now - b.last) * refillPerMs);
+    b.last = now;
   }
-  b.tokens = Math.min(cfg.cap, b.tokens + ((now - b.ts) / 1000) * cfg.refillPerSec);
-  b.ts = now;
-  if (b.tokens >= 1) {
-    b.tokens -= 1;
-    return { ok: true, remaining: Math.floor(b.tokens) };
+
+  if (b.tokens < 1) {
+    const retryAfter = Math.max(1, Math.ceil((1 - b.tokens) / refillPerMs / 1000));
+    return { ok: false, retryAfter };
   }
-  const retryAfter = Math.ceil((1 - b.tokens) / cfg.refillPerSec);
-  return { ok: false, retryAfter };
+  b.tokens -= 1;
+  return { ok: true, retryAfter: 0 };
+}
+
+export function resetRateLimit() {
+  BUCKETS.clear();
 }
 
 /* ----------------------------------------------------------------------- *
- * 4. 客户端真实 IP（仅受信反代后才信任 X-Forwarded-For，避免公网伪造绕过限流）
+ * 4. 客户端 IP 提取
  * ----------------------------------------------------------------------- */
-function isPrivateIp(ip) {
-  if (ip === '127.0.0.1' || ip === '::1') return true;
-  if (ip.startsWith('10.')) return true;
-  if (ip.startsWith('192.168.')) return true;
-  const m = ip.match(/^172\.(\d+)\./);
-  if (m && Number(m[1]) >= 16 && Number(m[1]) <= 31) return true;
-  if (ip.startsWith('169.254.')) return true;
-  return false;
-}
+const TRUST_PROXY = process.env.XUANXUE_TRUST_PROXY === '1';
 
 export function clientIp(req) {
-  const sock = req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : '';
-  const real = sock.replace(/^::ffff:/, '');
-  const xff = req.headers['x-forwarded-for'];
-  // 仅当连接来自内网/回环（前面有可信反代）时才信任 XFF 的第一个 IP
-  if (xff && (real === '127.0.0.1' || real === '::1' || isPrivateIp(real))) {
-    const first = String(xff).split(',')[0].trim();
-    if (first) return first;
+  if (TRUST_PROXY) {
+    const xff = req.headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff.trim()) {
+      return xff.split(',')[0].trim();
+    }
   }
-  return real;
+  return (req.socket && req.socket.remoteAddress) || '0.0.0.0';
 }
 
 /* ----------------------------------------------------------------------- *
- * 5. gzip 辅助
+ * 5. Gzip 压缩辅助
  * ----------------------------------------------------------------------- */
-const COMPRESSIBLE = new Set([
-  'text/html',
-  'application/javascript',
-  'text/css',
-  'application/json',
-  'image/svg+xml',
-]);
-const MIN_GZIP_BYTES = 1024;
+const COMPRESSIBLE = /^(text\/|application\/(json|javascript|manifest\+json)|image\/svg\+xml)/;
 
-export function isCompressible(contentType) {
-  const base = String(contentType || '').split(';')[0].trim();
-  return COMPRESSIBLE.has(base);
-}
-
-/** 尊重 Accept-Encoding，对可压缩且 >1KB 的 body 做 gzip。 */
 export function maybeGzip(req, contentType, buf) {
-  const ae = req.headers['accept-encoding'] || '';
-  if (!isCompressible(contentType) || buf.length <= MIN_GZIP_BYTES || !/\bgzip\b/.test(ae)) {
-    return { buf, encoding: null };
-  }
+  if (!buf || buf.length < 1024) return { buf, encoding: null };
+  if (!COMPRESSIBLE.test(contentType || '')) return { buf, encoding: null };
+  const ae = (req.headers && req.headers['accept-encoding']) || '';
+  if (!/\bgzip\b/i.test(ae)) return { buf, encoding: null };
   try {
-    return { buf: zlib.gzipSync(buf), encoding: 'gzip' };
+    return { buf: zlib.gzipSync(buf, { level: 6 }), encoding: 'gzip' };
   } catch {
     return { buf, encoding: null };
   }
 }
 
 /* ----------------------------------------------------------------------- *
- * 6. 内存 reports 的 LRU 容器（上限可配，超出按最近最少使用淘汰）
+ * 6. 进程内 LRU 缓存（用于 reports Map，防 OOM）
  * ----------------------------------------------------------------------- */
-// 内存报告上限：300 条，超出淘汰最久未访问。常量集中，便于调整。
 export const REPORTS_MAX = 300;
 
 export class LRUCache {
   constructor(max = REPORTS_MAX) {
     this.max = max;
-    this.map = new Map(); // 保持插入顺序即 LRU 顺序
+    this.map = new Map();
   }
   get(key) {
     if (!this.map.has(key)) return undefined;
-    const v = this.map.get(key);
+    const val = this.map.get(key);
     this.map.delete(key);
-    this.map.set(key, v); // 移到末尾表示最近使用
-    return v;
+    this.map.set(key, val);
+    return val;
   }
-  set(key, value) {
+  set(key, val) {
     if (this.map.has(key)) this.map.delete(key);
-    this.map.set(key, value);
+    this.map.set(key, val);
     while (this.map.size > this.max) {
       const oldest = this.map.keys().next().value;
       this.map.delete(oldest);
@@ -244,5 +209,8 @@ export class LRUCache {
   }
   get size() {
     return this.map.size;
+  }
+  clear() {
+    this.map.clear();
   }
 }

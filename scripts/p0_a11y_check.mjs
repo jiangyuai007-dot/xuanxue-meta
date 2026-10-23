@@ -16,9 +16,10 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { withBrowser } from './cdp.mjs';
 
-const root = path.resolve(import.meta.dirname, '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const web = path.join(root, 'web');
 const BASE = process.env.BASE || 'http://127.0.0.1:8787';
 const PAGES = ['bazi.html', 'hepan.html', 'liuyao.html', 'qimen.html', 'ziwei.html'];

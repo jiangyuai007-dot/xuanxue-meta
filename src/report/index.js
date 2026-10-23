@@ -1,9 +1,6 @@
 /**
- * 报告渲染：命盘可视化 + HTML 报告 + 分享卡 SVG
+ * 报告渲染：命盘可视化 + HTML 报告 + 国风宣纸分享卡 SVG
  * 只读事实包，不产生任何新的命理判断
- *
- * 命盘可视化已拆分为独立模块：src/report/charts/*
- *   bazi.js  / liuyao.js / qimen.js / ziwei.js —— 每个体系一套专业盘式 + 自带作用域样式
  */
 
 import { PALACE_NAME, PALACE_DIR } from '../engines/qimen.js';
@@ -49,7 +46,6 @@ th{background:var(--accent-bg);font-weight:600}
 export function renderChart(factPack) {
   const f = factPack.facts;
   if (!factPack || !f) return '';
-  // 注：八字专业盘需要完整 factPack（含输入信息，用于命主信息密表），其余体系仅需 facts
   if (factPack.system === 'bazi') return renderBazi(factPack);
   if (factPack.system === 'liuyao') return renderLiuyao(f);
   if (factPack.system === 'qimen') return renderQimen(f);
@@ -94,7 +90,6 @@ export function renderReportHtml({ factPack, interpretation, title }) {
       </table>
     </div>` : '';
 
-  // 免责声明：受 DISCLAIMER_ENABLED 总开关控制，关闭时整块 .disc 不渲染
   const disc = DISCLAIMER_ENABLED ? (interpretation.disclaimer || DISCLAIMER) : '';
 
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
@@ -112,47 +107,73 @@ export function renderReportHtml({ factPack, interpretation, title }) {
 </div><script src="/bazi-drill.js"></script></body></html>`;
 }
 
-/** 分享卡 SVG */
+/** Phase 3 升级：国风宣纸烫金朱印 SVG 分享卡 */
 export function renderShareCardSvg(factPack) {
   const f = factPack.facts;
   const sysName = SYSTEM_NAME[factPack.system] || factPack.system;
   let line1 = '';
   let line2 = '';
   let line3 = '';
+  let line4 = '';
   if (factPack.system === 'bazi') {
     line1 = `${f.fourPillars.year.name}　${f.fourPillars.month.name}　${f.fourPillars.day.name}　${f.fourPillars.hour.name}`;
-    line2 = `日主 ${f.dayMaster.gan}（${f.dayMaster.element}）　${f.strength.level}`;
-    line3 = `${f.pattern.name}　用神喜 ${f.yongshen.favorable.join('、')}`;
+    line2 = `日主 ${f.dayMaster.gan}（${f.dayMaster.element}）　强弱：${f.strength.level}（${f.strength.score}分）`;
+    line3 = `格局：${f.pattern.name}　喜用神：${f.yongshen.favorable.join('、')}`;
+    line4 = `胎元 ${f.taiyuan?.name || '—'} · 命宫 ${f.mingGong?.name || '—'} · 身宫 ${f.shenGong?.name || '—'}`;
   } else if (factPack.system === 'liuyao') {
     line1 = `${f.benGua.name} → ${f.bianGua.name}`;
-    line2 = `${f.benGua.gong}宫${f.benGua.gongElement}　${f.benGua.generation}`;
-    line3 = `用神 ${f.yongshen}　月建 ${f.yueJian.zhi}　日辰 ${f.riJian.ganzhi}`;
+    line2 = `${f.benGua.gong}宫${f.benGua.gongElement}（${f.benGua.generation}卦）　世爻：${f.shiYing?.shiPosition || '—'}`;
+    line3 = `用神：${f.yongshen}　月建 ${f.yueJian.zhi}（${f.yueJian.element}）　日辰 ${f.riJian.ganzhi}`;
+    line4 = `卦身 ${f.guaShen?.zhi || '—'} · 旬空 ${(f.xunkong || []).join('、')}`;
   } else if (factPack.system === 'hepan') {
     const f0 = f.parties || [];
-    line1 = `${f0[0]?.dayGanzhi || ''}　×　${f0[1]?.dayGanzhi || ''}`;
-    line2 = `契合指数 ${f.score}（${f.grade}）`;
-    line3 = `合 ${(f.he || []).length} 项／冲刑害破 ${(f.conflicts || []).length} 项`;
+    line1 = `${f0[0]?.name || '甲方'}(${f0[0]?.dayGanzhi || ''}) × ${f0[1]?.name || '乙方'}(${f0[1]?.dayGanzhi || ''})`;
+    line2 = `契合指数 ${f.score} 分 · ${f.grade}`;
+    line3 = `相合 ${(f.he || []).length} 项 ／ 冲刑害破 ${(f.conflicts || []).length} 项`;
+    line4 = f.headline || f.gradeDesc || '';
   } else if (factPack.system === 'ziwei') {
-    line1 = `命宫 ${f.mingGong.zhi}　身宫 ${f.shenGong.zhi}　${f.wuXingJu.name}`;
-    line2 = `紫微 ${f.ziweiZhi}宫　天府 ${f.tianfuZhi}宫`;
-    line3 = `四化：禄${f.fourHua.lu.star} 权${f.fourHua.quan.star} 科${f.fourHua.ke.star} 忌${f.fourHua.ji.star}`;
+    line1 = `命宫 ${f.mingGong.zhi}（${f.mingGong.ganzhi}） · 身宫 ${f.shenGong.zhi} · ${f.wuXingJu.name}`;
+    line2 = `紫微坐${f.ziweiZhi}宫 · 天府坐${f.tianfuZhi}宫 · 命主${f.mingZhu || '—'} / 身主${f.shenZhu || '—'}`;
+    line3 = `生年四化：禄${f.fourHua.lu.star} · 权${f.fourHua.quan.star} · 科${f.fourHua.ke.star} · 忌${f.fourHua.ji.star}`;
+    line4 = `四柱：${f.siZhu?.year || ''} ${f.siZhu?.month || ''} ${f.siZhu?.day || ''} ${f.siZhu?.hour || ''}`;
   } else {
-    line1 = `${f.juName}　${f.yuan}`;
-    line2 = `值符 ${f.zhiFu.star}@${f.zhiFu.palaceName}宫　值使 ${f.zhiShi.door}`;
-    line3 = `利 ${f.favorable.direction}方（${f.favorable.palaceName}宫 ${f.favorable.door}）`;
+    line1 = `${f.juName} · ${f.yuan}（${f.panMethod === 'fei' ? '飞盘' : '转盘'}）`;
+    line2 = `值符 ${f.zhiFu.star}@${f.zhiFu.palaceName}宫 · 值使 ${f.zhiShi.door}@${f.zhiShi.palaceName}宫`;
+    line3 = `吉方：${f.favorable.direction}方（${f.favorable.palaceName}宫 · ${f.favorable.door} · ${f.favorable.star}）`;
+    line4 = (f.patterns || []).length ? `格局：${f.patterns.slice(0, 4).map((x) => x.name).join(' · ')}` : `节气：${f.solarTerm} · 旬首 ${f.xunShou}`;
   }
-  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
-  <rect width="640" height="400" fill="#f7f6f3"/>
-  <rect x="0" y="0" width="640" height="6" fill="#8a6f4b"/>
-  <text x="40" y="66" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="20" fill="#8a6f4b">${esc(sysName)}</text>
-  <text x="40" y="140" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="34" font-weight="600" fill="#2c2c2a">${esc(line1)}</text>
-  <text x="40" y="192" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="18" fill="#5f5e5a">${esc(line2)}</text>
-  <text x="40" y="228" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="18" fill="#5f5e5a">${esc(line3)}</text>
-  <line x1="40" y1="264" x2="600" y2="264" stroke="#e6e3dd" stroke-width="1"/>
-  <text x="40" y="300" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="13" fill="#8a8a86">${esc(factPack.id)}</text>
-  ${DISCLAIMER_ENABLED ? `<text x="40" y="322" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" fill="#9c9b97">${esc(DISCLAIMER.slice(0, 30))}</text>
-  <text x="40" y="342" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11" fill="#9c9b97">${esc(DISCLAIMER.slice(30))}</text>` : ''}
+  const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="460" viewBox="0 0 720 460">
+  <defs>
+    <linearGradient id="xjPaper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbf7ee"/>
+      <stop offset="100%" stop-color="#f1ead8"/>
+    </linearGradient>
+    <linearGradient id="xjGold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#9a7720"/>
+      <stop offset="50%" stop-color="#c9a961"/>
+      <stop offset="100%" stop-color="#9a7720"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="460" rx="16" fill="url(#xjPaper)"/>
+  <rect x="14" y="14" width="692" height="432" rx="12" fill="none" stroke="url(#xjGold)" stroke-width="2"/>
+  <rect x="20" y="20" width="680" height="420" rx="9" fill="none" stroke="#dfd3ba" stroke-width="1" stroke-dasharray="4 3"/>
+  <rect x="42" y="42" width="116" height="32" rx="6" fill="#241d14"/>
+  <text x="100" y="63" text-anchor="middle" font-family="Noto Serif SC,Songti SC,serif" font-size="15" font-weight="700" fill="#e5c878" letter-spacing="2">${esc(sysName)}</text>
+  <g transform="translate(618, 38)">
+    <rect width="54" height="54" rx="6" fill="#b3392c"/>
+    <rect x="3" y="3" width="48" height="48" rx="4" fill="none" stroke="#f6f1e6" stroke-width="1.2"/>
+    <text x="27" y="24" text-anchor="middle" font-family="Noto Serif SC,serif" font-size="16" font-weight="700" fill="#f6f1e6">玄机</text>
+    <text x="27" y="44" text-anchor="middle" font-family="Noto Serif SC,serif" font-size="16" font-weight="700" fill="#f6f1e6">正印</text>
+  </g>
+  <text x="42" y="138" font-family="Noto Serif SC,PingFang SC,serif" font-size="32" font-weight="700" fill="#2c2418">${esc(line1)}</text>
+  <text x="42" y="192" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="18" font-weight="600" fill="#5b4930">${esc(line2)}</text>
+  <text x="42" y="234" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="17" fill="#6b5640">${esc(line3)}</text>
+  <text x="42" y="274" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="15" fill="#8b7d66">${esc(line4)}</text>
+  <line x1="42" y1="312" x2="678" y2="312" stroke="#dfd3ba" stroke-width="1"/>
+  <text x="42" y="346" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="13" fill="#8a7e6b">玄机 · 东方命理排盘与AI解读平台　｜　档案号：${esc(factPack.id)}</text>
+  ${DISCLAIMER_ENABLED ? `<text x="42" y="378" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" fill="#9c9282">${esc(DISCLAIMER.slice(0, 42))}</text>
+  <text x="42" y="398" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" fill="#9c9282">${esc(DISCLAIMER.slice(42))}</text>` : `<text x="42" y="382" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="12" fill="#9c9282">本命盘由确定性天文历算内核排定 · 仅供传统文化研习参考</text>`}
 </svg>`;
 }
 

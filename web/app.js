@@ -51,7 +51,6 @@ function profileLabel(p) {
 function renderProfiles() {
   const box = $('profileList');
   if (!box) return;
-  // 只显示当前体系的档案，避免跨页误载
   const list = loadProfiles().filter((p) => p.system === CURRENT_SYS);
   if (!list.length) {
     box.innerHTML = '<p class="rail-note" style="margin:0">暂无档案。排盘后点「保存当前」即可留存。</p>';
@@ -104,7 +103,11 @@ function applyProfile(id) {
   set('hour', i.hour); set('minute', i.minute);
   set('city', i.city || '北京');
   if (i.gender) set('gender', i.gender);
-  if (i.calendar) set('calendar', i.calendar);
+  if (i.calendar) {
+    set('calendar', i.calendar);
+    if ($('leap-wrap')) $('leap-wrap').style.display = i.calendar === 'lunar' ? '' : 'none';
+  }
+  if ($('isLeap')) $('isLeap').checked = !!i.isLeapMonth;
   if (i.method) set('method', i.method);
   if (Array.isArray(i.numbers)) {
     set('n1', i.numbers[0]); set('n2', i.numbers[1]);
@@ -118,33 +121,65 @@ function applyProfile(id) {
   runPaipan();
 }
 
-// ---------------------------------------------------------------- 已购（按档案维度持久化于本机）
+// ---------------------------------------------------------------- 已购（按档案维度持久化于本机，与合盘页统一 Array Schema）
 
 const PURCHASE_KEY = 'xuanxue.purchases';
 
+function normalizePurchases(raw) {
+  if (Array.isArray(raw)) return raw.filter((x) => x && typeof x === 'object');
+  if (raw && typeof raw === 'object') {
+    const migrated = [];
+    const ents = Array.isArray(raw.entitlements) ? raw.entitlements.filter(Boolean) : [];
+    for (const [sys, val] of Object.entries(raw)) {
+      if (sys === 'entitlements' || !Array.isArray(val) || !val.length) continue;
+      migrated.push({
+        skuId: `${sys}_migrated`,
+        skuName: '已解锁章节',
+        system: sys,
+        sectionKeys: val.filter((k) => typeof k === 'string'),
+        amount: 0,
+        paidAt: new Date().toISOString(),
+        entitlement: ents[0] || null,
+      });
+    }
+    for (let i = migrated.length ? 1 : 0; i < ents.length; i++) {
+      migrated.push({
+        skuId: 'entitlement_migrated',
+        skuName: '已购凭证',
+        system: 'hepan',
+        sectionKeys: [],
+        amount: 0,
+        paidAt: new Date().toISOString(),
+        entitlement: ents[i],
+      });
+    }
+    return migrated;
+  }
+  return [];
+}
+
 function loadPurchases() {
   try {
-    const v = JSON.parse(localStorage.getItem(PURCHASE_KEY));
-    return Array.isArray(v) ? v : [];
+    const raw = JSON.parse(localStorage.getItem(PURCHASE_KEY));
+    const list = normalizePurchases(raw);
+    if (raw && !Array.isArray(raw) && typeof raw === 'object') {
+      savePurchases(list);
+    }
+    return list;
   } catch {
     return [];
   }
 }
 function savePurchases(list) {
   try {
-    localStorage.setItem(PURCHASE_KEY, JSON.stringify(list));
+    localStorage.setItem(PURCHASE_KEY, JSON.stringify(normalizePurchases(list)));
   } catch {
     /* 隐私模式下可能不可写，忽略 */
   }
 }
-/**
- * 记录一笔已购：保存「服务端签发的权益凭证 token」（HMAC 签名，前端改不动）。
- * 旧版本存的是章节键数组，任何人改一行 localStorage 就能解锁全部付费内容（P0 漏洞），
- * 现在只存服务端凭证；解锁判定完全由服务端验签决定。
- */
+
 function addPurchase(rec) {
   const list = loadPurchases();
-  // 有服务端凭证时以凭证为准（防伪造）
   if (rec.entitlement) {
     if (!list.some((p) => p.entitlement === rec.entitlement)) list.unshift(rec);
     savePurchases(list.slice(0, 50));
@@ -157,9 +192,8 @@ function addPurchase(rec) {
   if (!dup) list.unshift(rec);
   savePurchases(list.slice(0, 50));
 }
-/** 交给后端的权益凭证数组（只发 token，不再发章节键） */
 function entitlementsForRequest() {
-  return loadPurchases().map((p) => p.entitlement).filter(Boolean);
+  return [...new Set(loadPurchases().map((p) => p.entitlement).filter(Boolean))];
 }
 function purchasedKeysForCurrentSystem() {
   const sys = CURRENT_SYS;
@@ -172,7 +206,6 @@ function purchasedKeysForCurrentSystem() {
 
 // ---------------------------------------------------------------- 表单
 
-/** 把时间行填成当下本地时间 */
 function setNow() {
   const d = new Date();
   const set = (eid, v) => { const e = $(eid); if (e) e.value = v; };
@@ -183,7 +216,6 @@ function setNow() {
   set('minute', d.getMinutes());
 }
 
-/** 起卦方式切换的显隐与提示（仅六爻页有这些元素） */
 function syncMethodUi() {
   if (!$('method')) return;
   const m = $('method').value;
@@ -193,7 +225,6 @@ function syncMethodUi() {
   show('coinWrap', m === 'coin');
   show('manualWrap', m === 'manual');
   show('nameWrap', m === 'name');
-  // 分段按钮高亮 + 行显隐（六爻新版表单）
   if ($('methodSeg')) {
     $('methodSeg').querySelectorAll('button[data-v]').forEach((b) => {
       b.classList.toggle('on', b.dataset.v === m);
@@ -224,7 +255,6 @@ function syncMethodUi() {
   refreshCoinPaipanState();
 }
 
-/** 在线摇卦状态 */
 const coinState = { lines: [], spinning: false };
 const COIN_POS = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻'];
 
@@ -232,11 +262,11 @@ function coinResultName(v) {
   return { 9: '老阳 ○（动）', 7: '少阳 ⚊', 8: '少阴 ⚋', 6: '老阴 ×（动）' }[v] || String(v);
 }
 
-/** 摇出一爻（三枚铜钱动画） */
 function castOneYao() {
   if (coinState.spinning) return;
   if (coinState.lines.length >= 6) return;
   coinState.spinning = true;
+  if (typeof navigator !== 'undefined' && navigator.vibrate) { try { navigator.vibrate([35, 40, 55]); } catch {} }
   const coins = document.querySelectorAll('#coinCoins .coin');
   coins.forEach((c) => c.classList.add('spin'));
   if ($('coinStatus')) $('coinStatus').textContent = '铜钱旋转中…';
@@ -272,7 +302,6 @@ function resetCoin() {
   refreshCoinPaipanState();
 }
 
-/** 六爻在线摇卦校验：未摇满六爻则给出拦截提示，auto/其它方式不涉及 */
 function coinValidationError() {
   if (CURRENT_SYS !== 'liuyao') return null;
   const m = $('method') ? $('method').value : 'time';
@@ -283,7 +312,6 @@ function coinValidationError() {
   return null;
 }
 
-/** 在线摇卦模式下，未摇满六爻时禁用起卦/报告按钮，给出明确前置约束 */
 function refreshCoinPaipanState() {
   if (CURRENT_SYS !== 'liuyao') return;
   const m = $('method') ? $('method').value : 'time';
@@ -294,7 +322,6 @@ function refreshCoinPaipanState() {
   });
 }
 
-/** 手动指定：四态循环 少阳(7)→老阳(9)→少阴(8)→老阴(6)，6/9 为动爻 */
 const manualState = [7, 7, 7, 7, 7, 7];
 const MANUAL_CYCLE = { 7: 9, 9: 8, 8: 6, 6: 7 };
 function buildManualYaos() {
@@ -330,7 +357,6 @@ function renderManualYaos() {
   });
 }
 
-/** 卦名起卦下拉 */
 const GUA64 = [
   '乾为天', '天泽履', '天火同人', '天雷无妄', '天风姤', '天水讼', '天山遁', '天地否',
   '泽天夬', '兑为泽', '泽火革', '泽雷随', '泽风大过', '泽水困', '泽山咸', '泽地萃',
@@ -367,13 +393,11 @@ function resetResult() {
   msg('');
 }
 
-/** 排盘/报告就绪后统一开「保存到我的报告」（与 btnHtml/btnCard 同步） */
 function enableSaveReport() {
   const b = $('btnSaveReport');
   if (b) b.disabled = !(currentInput && !b.dataset.busy);
 }
 
-/** 「保存到我的报告」：云历史只存输入参数，打开时确定性重排，不落整份报告 */
 async function saveToMyReports() {
   const b = $('btnSaveReport');
   if (!b || b.dataset.busy) return;
@@ -395,7 +419,7 @@ async function saveToMyReports() {
       title = (facts.juName ? facts.juName : '') + '奇门';
       subtitle = currentInput.question || '';
     }
-  } catch { /* 字段缺失就留空标题，后端仍可入库 */ }
+  } catch { /* ignore */ }
   b.dataset.busy = '1';
   b.disabled = true;
   const old = b.textContent;
@@ -407,9 +431,12 @@ async function saveToMyReports() {
       subtitle,
       payload: currentInput,
     });
+    delete b.dataset.busy;
+    b.textContent = old;
     msg(`已保存到我的报告（${r.updated ? '更新原有记录' : '新记录'}）`);
     enableSaveReport();
   } catch (e) {
+    delete b.dataset.busy;
     b.textContent = old;
     enableSaveReport();
     msg(e && e.message ? e.message : '保存失败', true);
@@ -429,12 +456,10 @@ function collectInput() {
     city: val('city', '北京') || '北京',
     useTrueSolarTime: $('useSolar') ? $('useSolar').checked : true,
   };
-  if (CURRENT_SYS === 'bazi') {
+  if (CURRENT_SYS === 'bazi' || CURRENT_SYS === 'ziwei') {
     base.calendar = val('calendar', 'gregorian');
     base.gender = val('gender', 'male');
     if (base.calendar === 'lunar' && $('isLeap')) base.isLeapMonth = $('isLeap').checked;
-  } else if (CURRENT_SYS === 'ziwei') {
-    base.gender = val('gender', 'male');
   } else if (CURRENT_SYS === 'liuyao') {
     base.method = val('method', 'time');
     base.question = val('question', '');
@@ -442,10 +467,8 @@ function collectInput() {
     if (base.method === 'number') base.numbers = [Number(val('n1', 0)), Number(val('n2', 0))];
     else if (base.method === 'number2') base.numbers = [Number(val('m1', 0)), Number(val('m2', 0)), Number(val('m3', 1))];
     else if (base.method === 'coin') {
-      // 在线摇卦：必须手动摇满六爻，不足时由 runPaipan/runReport 前置校验拦截
       base.lines = coinState.lines.slice();
     } else if (base.method === 'auto') {
-      // 自动起卦：系统随机摇出六爻（等同铜钱法），无需手动摇
       const lines = [];
       while (lines.length < 6) {
         const heads = (Math.random() < 0.5 ? 0 : 1) + (Math.random() < 0.5 ? 0 : 1) + (Math.random() < 0.5 ? 0 : 1);
@@ -505,7 +528,6 @@ function friendlyError(e) {
   return m;
 }
 
-/** 服务状态自检：探测 /api/health，顶部状态点 + 横幅双重反馈 */
 async function checkService() {
   const dot = $('svcDot');
   const txt = $('svcTxt');
@@ -549,7 +571,7 @@ function showResultHead(facts, system) {
     sub = `日主 ${facts.dayMaster.gan}（${facts.dayMaster.element}）　强弱 ${facts.strength.level}`;
   } else if (system === 'ziwei') {
     main = `命宫${facts.mingGong.zhi}　身宫${facts.shenGong.zhi}　${facts.wuXingJu.name}`;
-    sub = `紫微${facts.ziweiZhi}宫　天府${facts.tianfuZhi}宫`;
+    sub = `紫微${facts.ziweiZhi}宫　天府${facts.tianfuZhi}宫　命主${facts.mingZhu || '—'} · 身主${facts.shenZhu || '—'}`;
   } else if (system === 'liuyao') {
     main = `${facts.benGua.name} → ${facts.bianGua.name}`;
     sub = `${facts.benGua.gong}宫 ${facts.benGua.gongElement}`;
@@ -559,7 +581,29 @@ function showResultHead(facts, system) {
   }
   head.innerHTML = `<div><div class="rh-main">${main}</div><div class="rh-sub">${sub}</div></div><span class="rh-tag">已排盘</span>`;
   head.style.display = '';
+  if (typeof window.__xjCollapseForm === 'function') {
+    window.__xjCollapseForm({ badge: '已排盘', summary: `${main}　${sub}`, onPoster: openCurrentPoster, factPackId: currentFactPackId, system, facts });
+  }
 }
+
+function openCurrentPoster() {
+  if (!currentFactPackId) return;
+  if (typeof window.__xjOpenPosterModal === 'function') {
+    const inp = currentInput || {};
+    const subHeader = inp.year ? `${inp.gender === 'female' ? '女命' : '男命'} · ${inp.year}-${inp.month}-${inp.day} ${inp.hour ?? 0}:${String(inp.minute ?? 0).padStart(2, '0')} · ${inp.city || '北京'}` : '东方传统历算 · 本地确定性排盘';
+    window.__xjOpenPosterModal({
+      system: CURRENT_SYS,
+      factPackId: currentFactPackId,
+      reportToken: currentReportToken,
+      facts: currentFacts || (currentData && currentData.facts) || {},
+      input: inp,
+      subHeader,
+    });
+  } else {
+    window.open(`/api/report/${currentFactPackId}/sharecard.svg?t=${encodeURIComponent(currentReportToken)}`, '_blank');
+  }
+}
+
 
 // ---------------------------------------------------------------- 排盘与报告
 
@@ -590,14 +634,8 @@ async function runPaipan() {
   }
 }
 
-// ---------------------------------------------------------------- 报告：AI 固定骨架 + SSE 逐章推送
-//
-// 版式在服务端渲染层写死，这里只负责三件事：挂样式、铺骨架、把逐章推来的卡插到对应槽位。
-// 三级兜底：SSE 逐章 → 一次性 JSON → 老版 /api/report（本地规则版式）。
-
 const CN_NUM = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
 
-/** 章节卡样式由渲染层单源提供（/api/report/css → 服务端 TEMPLATE_CSS），前端只挂一次 */
 function ensureReportCss() {
   if (document.getElementById('rpCss')) return;
   const l = document.createElement('link');
@@ -607,7 +645,6 @@ function ensureReportCss() {
   document.head.appendChild(l);
 }
 
-/** 骨架屏（与服务端 renderSkeleton 同构，到位后被真实章节卡替换） */
 function renderReportSkeleton(list) {
   const box = $('reportBody');
   if (!box) return;
@@ -620,7 +657,6 @@ function renderReportSkeleton(list) {
   box.style.display = '';
 }
 
-/** 逐章到位：替换骨架槽位（没有槽位就直接追加，兼容两种来源） */
 function appendChapter(c) {
   const box = $('reportBody');
   if (!box || !c) return;
@@ -632,7 +668,6 @@ function appendChapter(c) {
   else box.appendChild(card);
 }
 
-/** 单章回落本地：卡片版式不变，只在下面补一行说明（用户无感） */
 function markFallback(key) {
   const box = $('reportBody');
   if (!box) return;
@@ -659,7 +694,6 @@ function updateReportProgress(done, total) {
   if (el && total) el.textContent = `AI 生成中 ${done}/${total} 章`;
 }
 
-/** 开卷：铺盘面 + 铺骨架 + 开按钮。start = SSE 的 start 事件或一次性响应的同构字段 */
 function beginReport(start) {
   currentFactPackId = start.factPackId || currentFactPackId;
   const chart = $('chart');
@@ -669,12 +703,12 @@ function beginReport(start) {
   try {
     showResultHead(currentFacts || {}, start.system || CURRENT_SYS);
   } catch {
-    /* 未先排盘时结果抬头信息不足，不影响报告主体 */
+    /* ignore */
   }
   const w = start.warnings || [];
   $('warnings').style.display = w.length ? '' : 'none';
   $('warnings').textContent = w.join('　｜　');
-  ensureReportCss(); // 必须先于骨架：卡片要盖掉占位样式
+  ensureReportCss();
   renderReportSkeleton(start.chapters || []);
   currentReportToken = start.reportToken || currentReportToken;
   $('btnHtml').disabled = false;
@@ -684,7 +718,6 @@ function beginReport(start) {
   msg('报告生成中，逐章展开…');
 }
 
-/** 一次性响应（?mode=json，或服务端没走 SSE）的收尾 */
 function consumeJsonReport(d) {
   beginReport({
     factPackId: d.factPackId,
@@ -700,7 +733,6 @@ function consumeJsonReport(d) {
   return (d.chapters || []).length > 0;
 }
 
-/** 老版 /api/report（本地规则版式）：SSE 与 JSON 都不可用时的最后兜底 */
 async function runReportLegacy(body) {
   const d = await api('/api/report', body);
   currentFactPackId = d.factPackId;
@@ -717,6 +749,9 @@ async function runReportLegacy(body) {
   renderSections(d);
   renderSkus(d);
   setReportSrc('local');
+  $('btnHtml').disabled = false;
+  $('btnCard').disabled = false;
+  enableSaveReport();
   msg('报告已生成（本地规则解读）');
 }
 
@@ -737,7 +772,6 @@ function parseSseEvent(raw) {
   return { event, data: payload };
 }
 
-/** SSE 逐章生成 */
 async function runReportSse(body) {
   const res = await fetch('/api/report/stream', {
     method: 'POST',
@@ -755,7 +789,6 @@ async function runReportSse(body) {
     }
     throw new Error(err);
   }
-  // 服务端没走 SSE（返回一次性 JSON）：直接按 JSON 收尾
   if (!/text\/event-stream/.test(ct)) return consumeJsonReport(await res.json());
   if (!res.body || !res.body.getReader) throw new Error('当前浏览器不支持流式读取');
 
@@ -777,7 +810,7 @@ async function runReportSse(body) {
         if (!ev) continue;
         if (ev.event === 'start') {
           total = (ev.data.chapters || []).length;
-          beginReport(ev.data);
+          if (total > 0) beginReport(ev.data);
         } else if (ev.event === 'chapter') {
           appendChapter(ev.data);
           done += 1;
@@ -798,7 +831,6 @@ async function runReportSse(body) {
       /* ignore */
     }
   }
-  // 该体系是否真的产出了章节（供上层决定是否回落本地规则版式）
   return done > 0 || total > 0;
 }
 
@@ -808,8 +840,6 @@ async function runReport() {
   setLoading($('btnReport'), true, '生成中…');
   currentInput = collectInput();
   const body = { input: currentInput, entitlements: entitlementsForRequest() };
-  // SSE 逐章 → 一次性 JSON；两者都没产出章节时（该体系尚未接入 AI 报告计划），
-  // 回落本地规则版式，保证六爻 / 奇门 / 紫微的报告可见（不再静默空白）。
   let rendered = false;
   try {
     rendered = await runReportSse(body);
@@ -840,7 +870,6 @@ function renderSections(d) {
     el.className = 'card' + (s.preview ? ' locked' : '');
     const hookHtml = s.preview
       ? `<div class="body">${escapeHtml(s.hook || s.text)}</div>` +
-        // 字数拿不到时（老缓存/异常数据）不展示「约 0 字」，避免误导付费决策
         (s.words ? `<div style="font-size:12px;color:#9a8a66;margin:-4px 0 10px;">解锁后完整可读 · 约 ${s.words} 字</div>` : '')
       : `<div class="body">${escapeHtml(s.text)}</div>`;
     el.innerHTML = `
@@ -850,8 +879,6 @@ function renderSections(d) {
     box.appendChild(el);
   });
 
-  // 免责声明：网关关闭时 disclaimer 为空串，此时不创建 .disc 节点
-  // （否则会渲染出一个空内容的灰底块，视觉上是一条多余的色条）
   const discText = (d.interpretation && d.interpretation.disclaimer) || '';
   if (discText.trim()) {
     const disc = document.createElement('div');
@@ -874,7 +901,6 @@ function renderSections(d) {
 
 function priceMap(system) {
   return {
-    // 与服务端 SECTION_PRICE.bazi 对齐：六亲已并入感情婚姻，神煞单列
     bazi: { xingge: 6.9, shiye: 6.9, caiyun: 6.9, ganqing: 6.9, jiankang: 6.9, shensha: 6.9, chenggu: 0.99, dayun: 9.9 },
     liuyao: { shiying: 6.9, dongyao: 6.9, advice: 9.9 },
     qimen: { direction: 9.9, palace: 6.9, advice: 9.9 },
@@ -885,12 +911,9 @@ function priceMap(system) {
 function renderSkus(d) {
   const box = $('sku');
   if (!box) return;
-  // 全站免费：不再展示任何套餐与价格（服务端已解除付费门禁）
   box.style.display = 'none';
   if ($('skuList')) $('skuList').innerHTML = '';
 }
-
-// ---------------------------------------------------------------- 已购章节键映射（前端侧，与服务端 SECTION_PRICE 对齐）
 
 function clientSkuSectionKeys(sku, system) {
   if (sku.id === 'single_section') return sku._sectionKey ? [sku._sectionKey] : [];
@@ -898,8 +921,6 @@ function clientSkuSectionKeys(sku, system) {
   if (sku.unlockAll) return Object.keys(priceMap(system));
   return [];
 }
-
-// ---------------------------------------------------------------- 解锁入口
 
 async function buySection(key) {
   openSectionModal(key);
@@ -939,7 +960,6 @@ async function confirmPay() {
     const body = { skuId: spec.skuId, system: CURRENT_SYS, factPackId: currentFactPackId };
     if (spec.skuId === 'single_section' && spec.sectionKeys[0]) body.sectionKey = spec.sectionKeys[0];
     const o = await api('/api/order', body);
-    // 支付响应里带服务端签发的权益凭证（HMAC），必须落盘：否则付了钱仍拿不到内容
     const paid = await api(`/api/order/${o.order.id}/pay`, {});
     const ent = paid && paid.order ? paid.order.entitlement : null;
     if (!ent) throw new Error('未取得服务端权益凭证，请重试或联系客服');
@@ -961,8 +981,6 @@ async function confirmPay() {
     msg(friendlyError(e), true);
   }
 }
-
-// ---------------------------------------------------------------- 支付弹层
 
 function ensurePayModal() {
   if ($('xjPayModal')) return;
@@ -1028,8 +1046,6 @@ function openPayModal(spec) {
   $('xjPayModal').style.display = 'flex';
 }
 
-// ---------------------------------------------------------------- 我的已购
-
 function ensureOrdersModal() {
   if ($('xjOrdersModal')) return;
   const wrap = document.createElement('div');
@@ -1071,7 +1087,6 @@ function openMyOrders() {
 }
 
 function injectMyOrdersButton() {
-  // 全站免费：不再需要「我的已购」入口
   return;
 }
 function escapeHtml(s) {
@@ -1081,9 +1096,7 @@ function escapeHtml(s) {
 // ---------------------------------------------------------------- 初始化
 
 function init() {
-  // 六爻/奇门页：时间默认当下
   if ((CURRENT_SYS === 'liuyao' || CURRENT_SYS === 'qimen') && $('year')) setNow();
-  // 奇门：自选局数显隐
   if ($('juMethod')) {
     $('juMethod').addEventListener('change', () => {
       if ($('customJuWrap')) $('customJuWrap').style.display = $('juMethod').value === 'custom' ? '' : 'none';
@@ -1099,11 +1112,9 @@ function init() {
   if ($('method')) {
     $('method').addEventListener('change', () => {
       syncMethodUi();
-      // 数字/铜钱起卦切回时间起卦时，时间也回到当下，避免用旧时间起卦
       if ($('method').value === 'time') setNow();
     });
   }
-  // 六爻分段式起卦方式按钮
   if ($('methodSeg')) {
     $('methodSeg').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-v]');
@@ -1113,7 +1124,6 @@ function init() {
       if (b.dataset.v === 'time') setNow();
     });
   }
-  // 六爻在线摇卦：点铜钱逐爻摇，重置按钮
   if ($('coinCoins')) $('coinCoins').addEventListener('click', castOneYao);
   if ($('btnCoinReset')) $('btnCoinReset').addEventListener('click', resetCoin);
 
@@ -1124,7 +1134,7 @@ function init() {
     if (currentFactPackId) window.open(`/api/report/${currentFactPackId}/html?t=${encodeURIComponent(currentReportToken)}`, '_blank');
   });
   $('btnCard').addEventListener('click', () => {
-    if (currentFactPackId) window.open(`/api/report/${currentFactPackId}/sharecard.svg?t=${encodeURIComponent(currentReportToken)}`, '_blank');
+    openCurrentPoster();
   });
   if ($('btnSaveReport')) $('btnSaveReport').addEventListener('click', saveToMyReports);
 

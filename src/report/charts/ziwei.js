@@ -1,15 +1,14 @@
 /**
  * 紫微斗数十二宫盘（交互版，对标文墨天机）
  *
- * 交互（纯 CSS radio + :checked，无脚本依赖）：
- *  1. 点任意宫位 → 该宫高亮，金色虚线「三方四正」随之变换（三合两宫 + 对宫）；
+ * 交互（纯 CSS radio/checkbox + :checked，无脚本依赖）：
+ *  1. 点任意宫位 → 该宫高亮，金色虚线「三方四正」+ 彩色「宫干四化飞星箭头（禄/权/科/忌）」同步绘制；
  *  2. 点各宫右上角的大限岁段 → 切换十年大限盘：十二宫名重排为大限十二宫、
  *     大限命宫金圈、下方面板显示大限干四化与十年流年（可点）；
  *  3. 点大限面板里的流年年份 → 流年盘：十二宫名重排为流年十二宫、
  *     流年命宫金圈、面板显示流年干支四化；
- *  4. 「本命盘」按钮一键回到本命宫名。
- *
- * 盘式：地支顺时针固定排布（巳午未申 / 辰酉 / 卯戌 / 寅丑子亥），中宫四格合为「命主信息区」。
+ *  4. 「精简/全盘」切换按钮 → 一键显隐博士/长生/将前/岁前 48 颗杂曜，适配手机窄屏；
+ *  5. 「本命盘」按钮一键回到本命宫名。
  */
 
 import { esc, list, WX_COLOR } from './shared.js';
@@ -56,20 +55,19 @@ const CSS = `
 .zw2 .zp.ming .lns i{color:#9a7720}
 .zw2 .zg{font-size:13.5px;color:#8b8172;white-space:nowrap;letter-spacing:1px}
 .zw2 .zg b{font-family:"Noto Serif SC",serif;font-weight:700}
+.zw2 .zw-dtl-btn{margin-left:auto;font-style:normal;font-size:10px;color:#8b8172;background:#f5efe2;border:1px solid #dfd5c0;border-radius:4px;padding:0 4px;line-height:1.5;cursor:pointer;flex:0 0 auto}
+.zw2 .zw-dtl-btn:hover{border-color:#b0812b;color:#9a7720;background:#fdf6e3}
 .zw2 .zp.ming .zg{color:#9a7720}
-/* 大限岁段：文墨式大字红号按钮（可点） */
 .zw2 .zd{display:block;font-size:15px;font-weight:800;color:#b3392c;cursor:pointer;user-select:none;padding:1px 3px;letter-spacing:.5px;line-height:1.4;border-radius:4px}
 .zw2 .zd:hover{background:#fdeeea}
 .zw2 .zd.cur{text-decoration:underline;text-underline-offset:3px}
 .zw2 .zp.ming .zd{color:#b3392c}
 .zw2 .zp.ming .zd:hover{background:#fdeeea}
-/* 流年虚岁速查（本宫作流年命宫的岁数） */
 .zw2 .zly{margin-top:2px;font-size:10px;color:#b3a88f;letter-spacing:.3px;white-space:nowrap;overflow:hidden}
 .zw2 .zcell{display:flex;flex-direction:column;flex:1;cursor:pointer;user-select:none;border-radius:8px;min-height:0}
 .zw2 .zcell:hover{background:rgba(176,129,43,.07)}
 .zw2 .zb{flex:1;margin-top:3px;display:flex;flex-direction:column;gap:2px}
 .zw2 .ms{font-size:14.5px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:2px}
-/* 庙旺利陷小字：陷/不得地标红提醒 */
 .zw2 .bd{font-style:normal;font-size:9.5px;color:#b3a88f;font-weight:400;margin-left:1px}
 .zw2 .bd.bad{color:#c05a4e;font-weight:700}
 .zw2 .ms em{font-style:normal;font-size:9.5px;line-height:14px;width:14px;height:14px;border-radius:3px;color:#fff;text-align:center;flex:0 0 auto}
@@ -77,10 +75,11 @@ const CSS = `
 .zw2 .fs{font-size:11.5px;color:#968b78;display:flex;align-items:center;gap:2px}
 .zw2 .zp.ming .fs{color:#968b78}
 .zw2 .fs em{font-style:normal;font-size:9px;line-height:12px;width:12px;height:12px;border-radius:2px;color:#fff;text-align:center}
-/* 杂曜（博士/长生/将前/岁前十二神等）：三列小字，更浅 */
 .zw2 .zzgrid{margin-top:2px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 4px}
 .zw2 .zz{font-size:9.5px;color:#b8ad97;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .zw2 .zp.ming .zz{color:#b3a276}
+#zw-simp:checked ~ .bwrap .zzgrid{display:none}
+#zw-simp:checked ~ .modebar .mbtn-sub{background:#2f7d52;color:#fff;border-color:#2f7d52}
 .zw2 .kongcell{margin-top:4px;font-size:10.5px;color:#c0b7a4;font-style:italic}
 .zw2 .js{font-size:12px;font-weight:600;letter-spacing:.5px;color:#b9ae98;font-style:italic}
 .zw2 .mid{grid-column:2 / span 2;grid-row:2 / span 2;background:linear-gradient(180deg,#fffdf8,#faf6ee);
@@ -93,17 +92,20 @@ const CSS = `
 .zw2 .mid .mhc4{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end}
 .zw2 .mid .mhc{font-style:normal;font-size:9.5px;line-height:15px;border-radius:3px;padding:0 4px;color:#fff;white-space:nowrap}
 .zw2 .mid .tip{font-size:10px;color:#8b8172;text-align:center;margin-top:2px}
-/* 三方四正虚线（浅灰，盖过中宫不被遮挡；细线低干扰） */
+/* 三方四正虚线 + 宫干四化飞星曲线 */
 .zw2 .lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
 .zw2 .lines g{opacity:0;transition:opacity .15s}
 .zw2 .lines line{stroke:#d8cba9;stroke-width:1.3;stroke-dasharray:6 5}
 .zw2 .lines circle{fill:rgba(251,247,236,.85);stroke:#d8cba9;stroke-width:1.1}
+.zw2 .lines path.fly-path{fill:none;stroke-width:1.5;opacity:.85}
+.zw2 .lines text.fly-lbl{font-size:8.5px;font-weight:700;paint-order:stroke;stroke:#fffdf8;stroke-width:2.5px}
 /* 模式条 / 面板 */
-.zw2 .modebar{border:1px solid var(--line);border-top:none;background:#f3e8cf;padding:7px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.zw2 .modebar{border:1px solid var(--line);border-top:none;background:#f3e8cf;padding:7px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .zw2 .mbtn{font-size:12.5px;font-weight:700;color:#fff;background:#b0812b;border-radius:4px;padding:3px 12px;cursor:pointer;user-select:none}
 .zw2 .mbtn:hover{background:#9a7720}
+.zw2 .mbtn-sub{background:#fffdf8;color:#6b5640;border:1px solid #d8cba9;font-weight:600}
+.zw2 .mbtn-sub:hover{background:#faf3df;color:#9a7720}
 .zw2 .mtip{font-size:11px;color:#a2977f}
-/* 底部大限速查导航（文墨式：全部岁段一排可点） */
 .zw2 .dxnav{border:1px solid var(--line);border-top:none;background:#f3e8cf;padding:8px 10px;display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
 .zw2 .dxnav label{font-size:12.5px;color:#6b5640;border:1px solid #e7ddc9;border-radius:4px;padding:3px 10px;cursor:pointer;background:#fffdf8;user-select:none;font-weight:600}
 .zw2 .dxnav label:hover{border-color:#b0812b;color:#9a7720}
@@ -114,6 +116,9 @@ const CSS = `
 .zw2 .panels>div{display:none;padding:12px 16px;font-size:13px;color:#6b5640;line-height:1.9}
 .zw2 .panels b{color:#2f2a22}
 .zw2 .panels .hc{font-style:normal;font-size:11.5px;border-radius:3px;padding:1px 5px;color:#fff;margin:0 1px}
+.zw2 .fly-row{margin-top:4px;font-size:12px;color:#6b5640;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.zw2 .fly-chip{display:inline-flex;align-items:center;gap:3px;background:#faf6ee;border:1px solid #e7ddc9;border-radius:4px;padding:1px 6px;font-size:11.5px}
+.zw2 .fly-chip i{font-style:normal;font-size:10px;border-radius:3px;padding:0 4px;color:#fff;font-weight:700}
 .zw2 .lnl{font-size:12px;color:#9a7720;cursor:pointer;user-select:none;border:1px solid #e7ddc9;border-radius:3px;padding:1px 6px;margin:1px 2px;display:inline-block;background:#fffdf8}
 .zw2 .lnl:hover{background:#f3e8cf;border-color:#b0812b}
 .zw2 .bn{font-style:normal}
@@ -179,7 +184,7 @@ export function renderZiwei(f) {
     });
   });
 
-  /* ---------- 每宫流年虚岁速查：虚岁 a 的流年地支 = 生年支 + a - 1 ---------- */
+  /* ---------- 每宫流年虚岁速查 ---------- */
   const birthZhiIdx = zhiIndexOf(f.lunar && f.lunar.yearGanzhi ? f.lunar.yearGanzhi[1] : '子');
   const lnAgeByZhi = {};
   for (let z = 0; z < 12; z++) {
@@ -189,8 +194,6 @@ export function renderZiwei(f) {
     lnAgeByZhi[ZHI_SEQ[z]] = ages;
   }
 
-  /* ---------- 宫位格（文墨式：星曜上 / 流年岁数 / 大号大限岁段 / 底部宫名干支） ---------- */
-  // 宫干支逐字按五行着色
   const gzColored = (gz) => {
     const s = String(gz || '');
     const ZHI_EL = { 子: '水', 丑: '土', 寅: '木', 卯: '木', 辰: '土', 巳: '火', 午: '火', 未: '土', 申: '金', 酉: '金', 戌: '土', 亥: '水' };
@@ -198,6 +201,7 @@ export function renderZiwei(f) {
     const g = GAN_EL[s[0]], zz = ZHI_EL[s[1]];
     return `<b style="color:${g ? elColor(g) : 'inherit'}">${esc(s[0] || '')}</b><b style="color:${zz ? elColor(zz) : 'inherit'}">${esc(s[1] || '')}</b>`;
   };
+
   const cellHtml = (zhi) => {
     const p = byZhi[zhi];
     if (!p) return '<div class="zp"></div>';
@@ -208,7 +212,6 @@ export function renderZiwei(f) {
     const zas = list(p.stars).filter((s) => s.kind === '杂');
     const mainRow = mains.map((s) =>
       `<span class="ms" style="color:${elColor(s.wuxing)}">${esc(s.name)}${s.brightness ? `<i class="bd${'陷不'.includes(s.brightness) ? ' bad' : ''}" title="${esc(s.name)}：${esc(s.brightness)}（庙旺得利平不陷七级）">${esc(s.brightness)}</i>` : ''}${huaChip(s.hua)}</span>`).join('');
-    // 空宫借星安宫：借对宫主星，灰色弱化显示（文墨式）
     const opp = byZhi[ZHI_SEQ[(ci + 6) % 12]];
     const borrow = mains.length === 0
       ? `<span class="js">${list(opp && opp.stars).filter((s) => s.kind === '主星').map((s) => `借${esc(s.name)}`).join('') || '<span class="kongcell">—</span>'}</span>`
@@ -218,7 +221,6 @@ export function renderZiwei(f) {
     const zaRow = zas.map((s) => `<span class="zz">${esc(s.name)}</span>`).join('');
     const lnAges = lnAgeByZhi[zhi] || [];
     const zly = `<span class="zly" title="流年命宫落本宫的虚岁：${lnAges.join(',')}">流年 ${lnAges.slice(0, 6).join(',')}</span>`;
-    // 十二套大限宫名 + 120 套流年宫名（选中对应状态时显示）
     const dxNames = dxList.map((d, k) => {
       const nm = PALACE_ORDER[(ci - zhiIndexOf(d.zhi) + 12) % 12];
       return `<i data-dx="${k}">${esc(nm)}</i>`;
@@ -231,13 +233,27 @@ export function renderZiwei(f) {
     const zd = dx
       ? `<label class="zd${dx.isCurrent ? ' cur' : ''}" data-dxz="${dx.order}" for="zwdx-${dx.order}" title="点击切换到 ${dx.ageStart}-${dx.ageEnd} 岁大限盘">${dx.ageStart}-${dx.ageEnd}${dx.isCurrent ? '·今' : ''}</label>`
       : '';
-    return `<div class="${cls}" data-i="${ci}" data-z="${esc(zhi)}">
+    const dtlTitle = `${p.name}（${p.ganzhi}宫）${p.isMing ? ' · 本命宫' : ''}${p.isShen ? ' · 身宫' : ''}`;
+    const fl = p.flyHua;
+    const flyTxt = fl ? ['lu', 'quan', 'ke', 'ji'].map((k) => {
+      const it = fl[k];
+      return it ? `化${it.label}：${it.star} → ${it.targetPalace || it.targetZhi}${it.isSelf ? '(本宫自化)' : (k === 'ji' && it.chongPalace ? `(冲${it.chongPalace})` : '')}` : '';
+    }).filter(Boolean).join(' ｜ ') : '';
+    const dtlBody = [
+      `【主星】${mains.length ? mains.map((s) => s.name + (s.brightness ? `(${s.brightness})` : '') + (s.hua ? `[生年化${s.hua.label}]` : '')).join('、') : `空宫（借对宫${opp ? opp.name : ''}：${list(opp && opp.stars).filter((s) => s.kind === '主星').map((s) => s.name).join('、') || '无'}）`}`,
+      `【辅星】${fus.length ? fus.map((s) => s.name + (s.hua ? `[生年化${s.hua.label}]` : '')).join('、') : '无'}`,
+      `【杂曜】${zas.length ? zas.map((s) => s.name).join('、') : '无'}`,
+      dx ? `【大限】${dx.ageStart}–${dx.ageEnd} 岁行本宫（大限干支 ${dx.ganzhi}）` : '',
+      flyTxt ? `【宫干飞化（${p.gan}干）】${flyTxt}` : '',
+      `【流年虚岁】${lnAges.slice(0, 8).join('、')} 岁`,
+    ].filter(Boolean).join('\n');
+    return `<div class="${cls}" data-i="${ci}" data-z="${esc(zhi)}" data-zw-title="${esc(dtlTitle)}" data-zw-detail="${esc(dtlBody)}">
       <label class="zcell" for="zwpg-${ci}">
-        <div class="zb">${mains.length ? mainRow : borrow}${fus.length ? `<span class="fsgrid">${fuRow}</span>` : (mains.length ? '<span class="kongcell">—</span>' : '')}</div>
+        <div class="zb">${mains.length ? mainRow : borrow}${fus.length ? `<span class="fsgrid">${fuRow}</span>` : (mains.length ? '<span class="kongcell">—</span>' : '')}${zas.length ? `<span class="zzgrid">${zaRow}</span>` : ''}</div>
         ${zly}
       </label>
       ${zd}
-      <label class="zh" for="zwpg-${ci}"><span class="zn">${esc(p.name)}${p.isShen ? '<b style="color:#b3392c">身</b>' : ''}</span><span class="dxns">${dxNames}</span><span class="lns">${lnNames}</span><span class="zg">${gzColored(p.ganzhi)}</span></label>
+      <label class="zh" for="zwpg-${ci}"><span class="zn">${esc(p.name)}${p.isShen ? '<b style="color:#b3392c">身</b>' : ''}</span><span class="dxns">${dxNames}</span><span class="lns">${lnNames}</span><span class="zg">${gzColored(p.ganzhi)}</span><u class="zw-dtl-btn qm-el" data-t="${esc(dtlTitle)}" data-x="${esc(dtlBody)}" title="查看本宫完整星曜与宫干飞化详情">详</u></label>
     </div>`;
   };
 
@@ -255,7 +271,8 @@ export function renderZiwei(f) {
     }
   }
 
-  /* ---------- 隐藏 radio：宫位 + 大限 + 流年 ---------- */
+  /* ---------- 隐藏 radio/checkbox：精简开关 + 宫位 + 大限 + 流年 ---------- */
+  const simpCheck = '<input class="r" type="checkbox" id="zw-simp">';
   const palaceRadios = ZHI_SEQ.map((z, i) =>
     `<input class="r" type="radio" name="zwpg" id="zwpg-${i}"${i === mingI ? ' checked' : ''}>`).join('');
   const dxRadios = ['<input class="r" type="radio" name="zwdx" id="zwdx-ben" checked>']
@@ -263,22 +280,45 @@ export function renderZiwei(f) {
   const lnRadios = lnStates.map((s) =>
     `<input class="r" type="radio" name="zwln" id="ln-${s.id}">`).join('');
 
-  /* ---------- 三方四正虚线（SVG 百分比坐标，描边保持像素级） ---------- */
-  const ctr = (zhi) => {
+  /* ---------- 三方四正虚线 + 宫干四化飞星曲线（viewBox 400×400） ---------- */
+  const ctrNum = (zhi) => {
     const [r, c] = GRID[zhi];
-    return { x: `${c * 25 + 12.5}%`, y: `${r * 25 + 12.5}%` };
+    return { x: c * 100 + 50, y: r * 100 + 50 };
   };
+  const svgDefs = `<defs>${['lu', 'quan', 'ke', 'ji'].map((k) =>
+    `<marker id="zw-arr-${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="${HUA_COLOR[k]}"/>
+    </marker>`
+  ).join('')}</defs>`;
+
   const lineGroups = ZHI_SEQ.map((z, i) => {
-    const from = ctr(z);
+    const from = ctrNum(z);
     const segs = partnersOf(i).map((j) => {
-      const to = ctr(ZHI_SEQ[j]);
+      const to = ctrNum(ZHI_SEQ[j]);
       return `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"></line>` +
         `<circle cx="${to.x}" cy="${to.y}" r="3.2"></circle>`;
     }).join('');
-    return `<g data-sel="${i}">${segs}</g>`;
+    // Phase 2 新增：宫干四化飞星箭头（禄/权/科/忌）
+    const p = byZhi[z];
+    const fl = p && p.flyHua;
+    const flySegs = fl ? ['lu', 'quan', 'ke', 'ji'].map((k, idx) => {
+      const item = fl[k];
+      if (!item || !item.targetZhi || !GRID[item.targetZhi]) return '';
+      const to = ctrNum(item.targetZhi);
+      const col = HUA_COLOR[k];
+      if (item.isSelf) {
+        const ox = from.x + (idx - 1.5) * 14;
+        const oy = from.y - 28;
+        return `<text class="fly-lbl" x="${ox}" y="${oy}" text-anchor="middle" fill="${col}">自化${item.label}</text>`;
+      }
+      const mx = (from.x + to.x) / 2 + (idx - 1.5) * 12;
+      const my = (from.y + to.y) / 2 + (1.5 - idx) * 10;
+      return `<path class="fly-path" d="M ${from.x} ${from.y} Q ${mx} ${my} ${to.x} ${to.y}" stroke="${col}" marker-end="url(#zw-arr-${k})"></path>`;
+    }).join('') : '';
+    return `<g data-sel="${i}">${segs}${flySegs}</g>`;
   }).join('');
 
-  /* ---------- 交互 CSS：宫位三方四正高亮 + 虚线显隐 ---------- */
+  /* ---------- 交互 CSS ---------- */
   const selCss = ZHI_SEQ.map((z, i) => {
     const self = `#zwpg-${i}:checked ~ .bwrap .zp[data-i="${i}"]`;
     const partners = partnersOf(i).map((j) =>
@@ -288,7 +328,6 @@ ${partners}{background:#faf3df;border-color:#cdb271}
 #zwpg-${i}:checked ~ .bwrap .lines g[data-sel="${i}"]{opacity:1}`;
   }).join('\n');
 
-  /* ---------- 交互 CSS：大限盘切换（宫名重排 + 大限命宫金圈 + 面板显隐） ---------- */
   const dxCss = dxList.map((d, k) => {
     const z0 = zhiIndexOf(d.zhi);
     return `#zwdx-${k}:checked ~ .bwrap .zn{display:none}
@@ -302,7 +341,6 @@ ${partners}{background:#faf3df;border-color:#cdb271}
   }).join('\n') + `\n#zwdx-ben:checked ~ .dxbar>div[data-dxp="ben"]{display:block}
 #zwdx-ben:checked ~ .dxnav label[data-dxn="ben"]{background:#b0812b;color:#fff;border-color:#b0812b}`;
 
-  /* ---------- 交互 CSS：流年盘（双条件：大限 + 流年同时选中） ---------- */
   const lnCss = lnStates.map((s) => {
     const dz0 = zhiIndexOf(dxList[s.dxOrder].zhi);
     const pre = `#zwdx-${s.dxOrder}:checked ~ #ln-${s.id}:checked`;
@@ -314,7 +352,7 @@ ${pre} ~ .bwrap .zp[data-i="${dz0}"]{box-shadow:0 0 0 2px rgba(176,129,43,.35)}
 ${pre} ~ .lnbar>div[data-lnp="${s.id}"]{display:block}`;
   }).join('\n');
 
-  /* ---------- 宫位信息面板（点宫位显示三方四正构成，宫名随大限联动） ---------- */
+  /* ---------- 宫位信息面板（含三方四正 + 宫干四化飞星） ---------- */
   const selPanels = ZHI_SEQ.map((z, i) => {
     const p = byZhi[z];
     if (!p) return '';
@@ -337,7 +375,14 @@ ${pre} ~ .lnbar>div[data-lnp="${s.id}"]{display:block}`;
       const nm = PALACE_ORDER[(i - zhiIndexOf(d.zhi) + 12) % 12];
       return `<i data-dxk="${k}"><b>大限 ${esc(nm)} · ${esc(p.ganzhi)}</b></i>`;
     }).join('')}</span>`;
-    return `<div data-selp="${i}">${selfBn}${selfDx}　三方四正 → ${parts}</div>`;
+    const fl = p.flyHua;
+    const flyHtml = fl ? `<div class="fly-row"><span>宫干飞化（<b>${esc(p.gan)}干</b>）：</span>${['lu', 'quan', 'ke', 'ji'].map((k) => {
+      const it = fl[k];
+      if (!it) return '';
+      const extra = it.isSelf ? '·本宫自化' : (k === 'ji' && it.chongPalace ? `·冲${esc(it.chongPalace)}` : '');
+      return `<span class="fly-chip"><i style="background:${HUA_COLOR[k]}">${esc(it.label)}</i>${esc(it.star)}→<b>${esc(it.targetPalace || it.targetZhi)}</b>${extra}</span>`;
+    }).join('')}</div>` : '';
+    return `<div data-selp="${i}">${selfBn}${selfDx}　三方四正 → ${parts}${flyHtml}</div>`;
   }).join('');
 
   const selPanelsCss = ZHI_SEQ.map((z, i) =>
@@ -358,9 +403,9 @@ ${pre} ~ .lnbar>div[data-lnp="${s.id}"]{display:block}`;
     <span style="color:#a2977f">十年流年（点年份切流年盘）：</span>${ln}</div>`;
   }).join('');
   const dxRange0 = dxList[0] ? `${dxList[0].ageStart}-${dxList[0].ageEnd}` : '';
-  const benPanel = `<div data-dxp="ben"><b>本命盘</b>　点击各宫左上角的大限岁段（${esc(dxRange0)} …）切换十年大限盘：十二宫名重排、大限四化与十年流年同步显示；点流年年份进入流年盘；点上方「本命盘」还原。</div>`;
+  const benPanel = `<div data-dxp="ben"><b>本命盘</b>　点击任意宫位查看三方四正与宫干四化飞星；点各宫左上角的大限岁段（${esc(dxRange0)} …）切换十年大限盘；点流年年份进入流年盘。</div>`;
 
-  /* ---------- 底部大限速查导航（文墨式） ---------- */
+  /* ---------- 底部大限速查导航 ---------- */
   const dxNav = `<div class="dxnav"><label data-dxn="ben" for="zwdx-ben">本命</label>` +
     dxList.map((d) => `<label data-dxn="${d.order}" for="zwdx-${d.order}"${d.isCurrent ? ' data-cur="1"' : ''} title="${d.ageStart}-${d.ageEnd} 岁 · ${esc(d.zhi)}宫 · ${esc(d.palace)}">${d.ageStart}-${d.ageEnd}</label>`).join('') + `</div>`;
 
@@ -397,14 +442,19 @@ ${selPanelsCss}</style><div class="zw2">
         <i style="background:${HUA_COLOR.ji}">化忌 ${esc(four.ji ? four.ji.star : '—')}</i>
       </div>
     </div>
+    ${simpCheck}
     ${palaceRadios}
     ${dxRadios}
     ${lnRadios}
     <div class="bwrap">
       <div class="board">${board.join('')}</div>
-      <svg class="lines" width="100%" height="100%">${lineGroups}</svg>
+      <svg class="lines" viewBox="0 0 400 400" preserveAspectRatio="none" width="100%" height="100%">${svgDefs}${lineGroups}</svg>
     </div>
-    <div class="modebar"><label class="mbtn" for="zwdx-ben">本命盘</label><span class="mtip">点宫位＝三方四正 · 点宫格内红色大字岁段或底部大限条＝大限盘 · 大限面板点年份＝流年盘</span></div>
+    <div class="modebar">
+      <label class="mbtn" for="zwdx-ben">本命盘</label>
+      <label class="mbtn mbtn-sub" for="zw-simp" title="切换显示/隐藏四十八杂曜（博士/长生/将前/岁前），小屏推荐精简盘">精简/全盘</label>
+      <span class="mtip">点宫位＝三方四正＋宫干四化飞星 · 点岁段或底部条＝大限盘 · 点流年年份＝流年盘</span>
+    </div>
     <div class="panels selbar">${selPanels}</div>
     <div class="panels dxbar">${benPanel}${dxPanels}</div>
     <div class="panels lnbar">${lnPanels}</div>
@@ -415,10 +465,8 @@ ${selPanelsCss}</style><div class="zw2">
       <em><i style="background:${HUA_COLOR.quan}"></i>权</em>
       <em><i style="background:${HUA_COLOR.ke}"></i>科</em>
       <em><i style="background:${HUA_COLOR.ji}"></i>忌</em>
-      <em style="color:#b0a894">┄ 三方四正（浅灰虚线 · 点宫位变换）</em>
+      <em style="color:#b0a894">┄ 三方四正＋宫干四化飞星（点宫位变换）</em>
       <em style="color:#b3392c">红色岁段 = 大限入口</em>
-      <em style="color:#b3a88f">星后小字 = 亮度 庙＞旺＞得＞利＞平＞不＞陷（通行版，流派略有出入）</em>
-      <em style="color:#b8ad97">浅灰小字 = 杂曜（博士/长生/将前/岁前十二神等，共 100+ 星；杂曜安法以通行规则为准）</em>
     </div>
     ${f.meta && list(f.meta.approximations).length ? `<div class="note">${esc(list(f.meta.approximations)[0])}</div>` : ''}
   </div>`;
@@ -451,6 +499,6 @@ function middleBlock(f) {
     ${row('五行局', `${esc(f.wuXingJu.name)}　${f.wuXingJu.number}岁起运`)}
     <div class="mrow"><span>生年四化</span><b class="mhc4">${hc('lu', four.lu && four.lu.star)}${hc('quan', four.quan && four.quan.star)}${hc('ke', four.ke && four.ke.star)}${hc('ji', four.ji && four.ji.star)}</b></div>
     ${row('当前大限', cur ? `${cur.ageStart}-${cur.ageEnd} 岁 · ${esc(cur.zhi)}宫（${esc(cur.ganzhi)}）` : '—')}
-    <div class="tip">点宫位看三方四正 · 点左上岁段或底部大限条切大限 · 点流年切流年盘</div>
+    <div class="tip">点宫位看三方四正＋宫干飞化 · 点左上岁段或底部条切大限</div>
   </div>`;
 }

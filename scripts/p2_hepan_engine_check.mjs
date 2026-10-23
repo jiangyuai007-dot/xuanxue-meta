@@ -1,6 +1,6 @@
 /**
  * 合盘引擎自检（不依赖服务，直接 import 引擎）
- *  Purpose：确认 computeHePan 的输入/输出契约、确定性、指数区间。
+ *  Purpose：确认 computeHePan 的输入/输出契约、确定性、指数区间、生肖维度年支准确性。
  */
 import { computeBazi } from '../src/engines/bazi.js';
 import { computeHePan, HEWAN_ENGINE_VERSION } from '../src/engines/hepan.js';
@@ -37,6 +37,17 @@ ok('dims 四维齐全', ['day', 'combine', 'wuxing', 'zodiac'].every((d) => f.di
 ok('he/conflicts 是数组', Array.isArray(f.he) && Array.isArray(f.conflicts), `合 ${f.he.length} 项 / 冲克 ${f.conflicts.length} 项`);
 ok('headline 非空', !!f.headline && f.headline.length > 6);
 ok('summary 含双方日柱', f.summary.includes(f.parties[0].dayGanzhi) && f.summary.includes(f.parties[1].dayGanzhi));
+
+section('2b 生肖维度（Phase 1 回归锁死：按年支生肖而非日支判定）');
+// 1990 庚午（马）× 1991 辛未（羊）→ 午未六合（生肖六合），不受日支影响
+const horse = computeBazi({ type: 'bazi', year: 1990, month: 6, day: 15, hour: 10, gender: 'male', city: '北京' });
+const goat = computeBazi({ type: 'bazi', year: 1991, month: 6, day: 15, hour: 10, gender: 'female', city: '北京' });
+const hpHorseGoat = computeHePan({ a: horse, b: goat });
+ok('1990午马 × 1991未羊 判定为「生肖六合」', hpHorseGoat.zodiac.ziKind === '生肖六合', `${horse.lunar.zodiac}×${goat.lunar.zodiac} -> ${hpHorseGoat.zodiac.ziKind}`);
+// 同年同属马（午×午），即使日支相冲，生肖也不得被误判为「生肖相冲」
+const horse2 = computeBazi({ type: 'bazi', year: 1990, month: 6, day: 21, hour: 10, gender: 'female', city: '北京' });
+const hpSameZodiac = computeHePan({ a: horse, b: horse2 });
+ok('同属马（午×午）不同日支，绝不误判为生肖相冲/六合', hpSameZodiac.zodiac.ziKind === '无特殊关系', `${horse.fourPillars.day.name}×${horse2.fourPillars.day.name} -> ${hpSameZodiac.zodiac.ziKind}`);
 
 section('3 确定性');
 const f2 = computeHePan({ a: A, b: B, names: { a: '男方', b: '女方' } });

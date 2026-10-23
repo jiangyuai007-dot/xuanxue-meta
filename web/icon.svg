@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2c2318"/>
+      <stop offset="100%" stop-color="#1b150e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e5c878"/>
+      <stop offset="50%" stop-color="#c9a24b"/>
+      <stop offset="100%" stop-color="#9a7320"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="28" y="28" width="456" height="456" rx="92" fill="none" stroke="url(#gold)" stroke-width="6" opacity="0.85"/>
+  <circle cx="256" cy="256" r="184" fill="none" stroke="url(#gold)" stroke-width="3" stroke-dasharray="10 6" opacity="0.55"/>
+  <text x="256" y="328" text-anchor="middle" font-family="'Noto Serif SC','Songti SC',serif" font-size="236" font-weight="700" fill="url(#gold)">玄</text>
+  <rect x="352" y="346" width="64" height="64" rx="10" fill="#b3392c"/>
+  <text x="384" y="392" text-anchor="middle" font-family="'Noto Serif SC',serif" font-size="38" font-weight="700" fill="#f6f1e6">机</text>
+</svg>

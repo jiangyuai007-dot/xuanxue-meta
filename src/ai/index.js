@@ -4,9 +4,7 @@
  * 单次调用只负责一章；一章坏了只坏一章（这是相对旧实现最大的改进）。
  * 三级降级：缓存 → AI → 本地规则引擎。全部失败也一定有内容（source 会如实标记）。
  *
- * 对外主要两个函数：
- *   generateChapter()  单章（供 SSE 逐章推送）
- *   generateReport()   整份（内部按并发池推进，逐章回调）
+ * Phase 2 升级：支持八字、合盘、六爻、奇门、紫微五大体系统一走 Slot 协议与本地规则引擎兜底。
  */
 
 import { getChapter, listChapters, buildFactLines, PLAN_VERSION } from '../core/reportPlan.js';
@@ -16,8 +14,8 @@ import { makeRequestSpec } from './schema.js';
 import { buildSystem, buildUser, buildRetryUser } from './prompt.js';
 import { parseChapterResponse } from './parse.js';
 
-/** 本地章节 key → 本地规则引擎的 key（用于兜底时的文本来源） */
-const LOCAL_KEY_MAP = {
+/** 八字本地章节 key → 本地规则引擎的 key */
+const BAZI_LOCAL_KEY_MAP = {
   mingju: 'mingju',
   geju: 'geju',
   xingge: 'xingge',
@@ -29,45 +27,84 @@ const LOCAL_KEY_MAP = {
   chenggu: 'chenggu',
 };
 
-/** 本地规则引擎兜底：把本地文案转成 slot 结构（版式仍由渲染层写死） */
-async function localFallback(chapter, facts, factLines) {
-  const localKey = LOCAL_KEY_MAP[chapter.key];
+/** 本地规则引擎兜底：把各体系本地文案转成统一 slot 结构（版式仍由渲染层写死） */
+async function localFallback(chapter, facts, factLines, system = 'bazi') {
   const warnings = ['已回落本地规则引擎（AI 不可用）'];
-  // 依据溯源同样只认真实编号：本地兜底也走 slot 协议，版式与 AI 章完全一致
   const basis = factLines.slice(0, 4).map((l) => l.id);
 
-  // 神煞章本地无独立章节，直接用事实行拼一段客观描述
-  if (!localKey) {
-    return {
-      data: {
-        headline: `${chapter.title}`,
-        summary: factLines.map((l) => l.text).join('；'),
-        points: [],
-        basis,
-        advice: [],
-      },
-      warnings,
-    };
-  }
-
-  let sections = [];
   try {
-    // 动态引入，避免主进程启动就被 55KB 的解读器拖慢
-    const mod = await import('../interpret/bazi/index.js');
-    sections = mod.baziSections(facts) || [];
+    if (system === 'hepan') {
+      const mod = await import('../report/templates/hepan.js');
+      const items = mod.hepanLocalChapters(facts) || [];
+      const found = items.find((x) => x.chapter?.key === chapter.key);
+      if (found && found.data) {
+        const pts = (found.data.points && found.data.points.length)
+          ? found.data.points
+          : factLines.slice(0, 3).map((l) => ({
+              t: (l.text.split(/[：:，。]/)[0] || chapter.title).slice(0, 8),
+              d: l.text,
+            }));
+        return {
+          data: {
+            headline: found.data.headline || chapter.title,
+            summary: found.data.summary || factLines.map((l) => l.text).join('；'),
+            points: pts,
+            basis,
+            advice: found.data.advice || [],
+          },
+          warnings,
+        };
+      }
+    } else if (system === 'liuyao') {
+      const mod = await import('../interpret/deep/liuyaoBuild.js');
+      const sections = mod.liuyaoChapters(facts) || [];
+      const sec = sections.find((s) => s.key === chapter.key);
+      if (sec) return parseLocalText(sec.text, chapter, warnings, basis, factLines);
+    } else if (system === 'qimen') {
+      const mod = await import('../interpret/deep/qimenBuild.js');
+      const sections = mod.qimenChapters(facts) || [];
+      const sec = sections.find((s) => s.key === chapter.key);
+      if (sec) return parseLocalText(sec.text, chapter, warnings, basis, factLines);
+    } else if (system === 'ziwei') {
+      const mod = await import('../interpret/deep/ziweiBuild.js');
+      const sections = mod.ziweiChapters(facts) || [];
+      const sec = sections.find((s) => s.key === chapter.key);
+      if (sec) return parseLocalText(sec.text, chapter, warnings, basis, factLines);
+    } else {
+      const localKey = BAZI_LOCAL_KEY_MAP[chapter.key];
+      if (localKey) {
+        const mod = await import('../interpret/bazi/index.js');
+        const sections = mod.baziSections(facts) || [];
+        const sec = sections.find((s) => s.key === localKey);
+        if (sec) return parseLocalText(sec.text, chapter, warnings, basis, factLines);
+      }
+    }
   } catch (e) {
     warnings.push(`本地兜底读取失败：${e.message}`);
   }
-  const sec = sections.find((s) => s.key === localKey);
-  if (!sec) {
-    return { data: { headline: chapter.title, summary: '', points: [], basis, advice: [] }, warnings };
-  }
 
-  return parseLocalText(sec.text, chapter, warnings, basis);
+  // 通用事实行兜底（如八字神煞章或奇门四害与吉凶格局章）
+  const fallbackPts = factLines.slice(0, Math.min(3, factLines.length)).map((l) => {
+    const [head, ...rest] = String(l.text || '').split(/[：:]/);
+    return {
+      t: (head || chapter.title).slice(0, 8),
+      d: (rest.length ? rest.join('：') : l.text).slice(0, 90),
+    };
+  });
+  return {
+    data: {
+      headline: `${chapter.title}核心盘面特征`,
+      summary: factLines.map((l) => l.text).join('；') || `${chapter.title}已根据本地确定性排盘完成结构化梳理。`,
+      points: fallbackPts,
+      basis,
+      advice: ['结合自身现实条件与长远规划理性参考，切勿将传统命理概念作为唯一决策依据。'],
+    },
+    warnings,
+  };
 }
 
 /** 本地纯文本 → slot 结构 */
-function parseLocalText(text, chapter, warnings, basis = []) {
+function parseLocalText(text, chapter, warnings, basis = [], factLines = []) {
   const seg = (tag) => {
     const m = text.match(new RegExp(`【${tag}】([\\s\\S]*?)(?=\\n【|$)`));
     return m ? m[1] : '';
@@ -78,8 +115,7 @@ function parseLocalText(text, chapter, warnings, basis = []) {
       .map((l) => l.replace(/^[-·*]\s*/, '').trim())
       .filter((l) => l.length > 4)
       .slice(0, chapter.slots.points?.max ?? 4)
-      // 小标题取句首短语（到第一个标点为止，≤6 字），避免本地兜底硬截出来的半截话
-      .map((l) => ({ t: (l.split(/[，。、：；,.]/)[0] || l).slice(0, 6) || '要点', d: l }));
+      .map((l) => ({ t: (l.split(/[，。、：；,.]/)[0] || l).slice(0, 8) || '要点', d: l }));
 
   const summary = text
     .replace(/【要点】[\s\S]*?(?=\n【|$)/, '')
@@ -88,19 +124,34 @@ function parseLocalText(text, chapter, warnings, basis = []) {
     .replace(/\n{2,}/g, '\n')
     .trim();
 
-  const points = toPoints(seg('要点'));
+  let points = toPoints(seg('要点'));
+  if (!points.length && factLines.length) {
+    points = factLines.slice(0, 3).map((l) => {
+      const [head, ...rest] = String(l.text || '').split(/[：:]/);
+      return {
+        t: (head || chapter.title).slice(0, 8),
+        d: (rest.length ? rest.join('：') : l.text).slice(0, 90),
+      };
+    });
+  }
 
+  let advice = seg('建议')
+    .split('\n')
+    .map((l) => l.replace(/^[-·*]\s*/, '').trim())
+    .filter((l) => l.length > 4)
+    .slice(0, 3);
+  if (!advice.length && chapter.slots?.advice) {
+    advice = ['以上分析基于盘面固有结构推演，建议结合当前实际处境稳步推进。'];
+  }
+
+  const firstSentence = (summary.split(/[。！？\n]/)[0] || summary).trim();
   return {
     data: {
-      headline: summary.slice(0, chapter.slots.headline?.max ?? 24),
+      headline: firstSentence.slice(0, chapter.slots.headline?.max ?? 26),
       summary,
       points: points || [],
       basis,
-      advice: seg('建议')
-        .split('\n')
-        .map((l) => l.replace(/^[-·*]\s*/, '').trim())
-        .filter((l) => l.length > 4)
-        .slice(0, 3),
+      advice,
     },
     warnings,
   };
@@ -108,13 +159,6 @@ function parseLocalText(text, chapter, warnings, basis = []) {
 
 /**
  * 生成单章
- * @param {object} p
- * @param {string} p.system
- * @param {string} p.chapterKey
- * @param {object} p.facts        factpack.facts
- * @param {string} p.factPackId
- * @param {boolean} [p.useCache]  默认 true
- * @returns {Promise<{key,title,free,order,data,source,warnings,latencyMs,via,error}>}
  */
 export async function generateChapter(p) {
   const { system = 'bazi', chapterKey, facts = {}, factPackId = '', useCache = true } = p;
@@ -135,7 +179,6 @@ export async function generateChapter(p) {
   }
 
   // 本章事实行（AI 与本地兜底共用，编号即依据溯源的白名单）
-  // system 必须传下去：合盘（hepan）的抽取器和八字是两套
   const factLines = buildFactLines(chapterKey, facts, system);
 
   // 2) AI（不可用/失败 → 直接落本地）
@@ -159,7 +202,6 @@ export async function generateChapter(p) {
         aiData = parsed.data;
         aiMeta = { via: parsed.via, warnings: parsed.warnings, error: '' };
       } else {
-        // tool 路径失败：用精简 user 再叫一次（明确要求 JSON）
         const r2 = await client.chat({
           messages: [
             { role: 'system', content: buildSystem(chapter) },
@@ -167,7 +209,6 @@ export async function generateChapter(p) {
           ],
           max_tokens: spec.maxTokens,
           temperature: 0.2,
-          // 实测 agnes 支持 json_object 模式：工具调用被截断时走这条，返回干净 JSON
           response_format: { type: 'json_object' },
         });
         if (r2.ok) {
@@ -203,7 +244,7 @@ export async function generateChapter(p) {
   }
 
   // 3) 本地兜底（用户无感）
-  const local = await localFallback(chapter, facts, factLines);
+  const local = await localFallback(chapter, facts, factLines, system);
   return {
     ...pick(chapter),
     data: local.data,
@@ -217,10 +258,6 @@ export async function generateChapter(p) {
 
 const pick = (chapter) => ({ key: chapter.key, title: chapter.title, order: chapter.order, free: !!chapter.free });
 
-/**
- * 整份报告的来源汇总口径（纯函数，便于单测）：
- * ai 优先 → cache 次之（缓存里存的就是 AI 产物，不是本地兜底）→ 真的一章 AI 都没拿到才 local-fallback。
- */
 export function aggSource(results) {
   const n = (s) => (results || []).filter((r) => r && r.source === s).length;
   if (n('ai') > 0) return 'ai';
@@ -228,11 +265,6 @@ export function aggSource(results) {
   return 'local-fallback';
 }
 
-/**
- * 生成整份报告（逐章推进，并发受 client 池约束）
- * @param {object} p { system, factPackId, facts, useCache, onChapter(chapterResult, progress) }
- * @returns {Promise<{chapters:Array, source, warnings, totalMs, aiCount, localCount, cacheCount}>}
- */
 export async function generateReport(p) {
   const { system = 'bazi', facts, factPackId = '', useCache = true, onChapter } = p;
   const chapters = listChapters(system);
@@ -247,7 +279,6 @@ export async function generateReport(p) {
     return r;
   };
 
-  // 分批并发：批次大小跟随 AI 并发池，批次内串行，避免限流
   const size = Math.max(1, Math.min(client.CONFIG.concurrency, chapters.length));
   for (let i = 0; i < chapters.length; i += size) {
     await Promise.all(chapters.slice(i, i + size).map(worker));

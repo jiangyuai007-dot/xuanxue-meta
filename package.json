@@ -1,15 +1,19 @@
 {
   "name": "mingli-app",
-  "version": "1.0.0",
+  "version": "1.4.0-phase4",
   "private": true,
   "type": "module",
-  "description": "命理内容产品原型：确定性排盘引擎 + 本地解读引擎 + 合规网关 + 报告渲染（零第三方依赖）",
+  "description": "命理内容产品：确定性排盘引擎 + 全体系 AI Slot 报告 + FactPack 护栏追问 + 每日个人黄历 + 合规网关 + PWA（零第三方依赖）",
   "main": "src/server/index.js",
   "scripts": {
     "start": "node src/server/index.js",
     "test": "node tests/run.js",
     "smoke": "node tests/smoke.js",
-    "check": "node tests/run.js && node tests/smoke.js"
+    "check": "node tests/run.js && node tests/smoke.js",
+    "test:phase1": "node scripts/phase1_verify.mjs",
+    "test:phase2": "node scripts/phase2_verify.mjs",
+    "test:phase3": "node scripts/phase3_verify.mjs",
+    "test:phase4": "node scripts/phase4_verify.mjs"
   },
   "engines": {
     "node": ">=18"

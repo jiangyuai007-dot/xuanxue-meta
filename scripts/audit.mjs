@@ -28,6 +28,9 @@ const FULL = process.argv.includes('--full');
 const CHROME_CANDS = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/google-chrome',
 ];
 const CHROME = CHROME_CANDS.find((c) => fs.existsSync(c));
 if (!CHROME) { console.error('未找到 Chrome'); process.exit(1); }
@@ -50,7 +53,7 @@ const userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'xuanxue-cdp-'));
 const chrome = spawn(CHROME, [
   '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
   `--remote-debugging-port=${DBG}`, '--remote-allow-origins=*',
-  `--user-data-dir=${userDir}`, '--no-first-run', '--no-default-browser-check',
+  `--user-data-dir=${userDir}`, '--no-proxy-server', '--no-first-run', '--no-default-browser-check',
   '--hide-scrollbars', 'about:blank',
 ], { stdio: 'ignore' });
 

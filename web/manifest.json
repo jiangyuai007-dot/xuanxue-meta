@@ -1,0 +1,52 @@
+{
+  "name": "玄机 · 东方命理排盘与AI解读平台",
+  "short_name": "玄机排盘",
+  "description": "专业四柱八字、紫微斗数、奇门遁甲、六爻占卜与八字合盘双端排盘工具，内置确定性历算内核与结构化 AI 深度命书。",
+  "start_url": "/bazi.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f6f1e6",
+  "theme_color": "#241d14",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "八字排盘",
+      "short_name": "八字",
+      "url": "/bazi.html",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "紫微斗数",
+      "short_name": "紫微",
+      "url": "/ziwei.html",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "奇门遁甲",
+      "short_name": "奇门",
+      "url": "/qimen.html",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "六爻占卜",
+      "short_name": "六爻",
+      "url": "/liuyao.html",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "八字合盘",
+      "short_name": "合盘",
+      "url": "/hepan.html",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    }
+  ]
+}

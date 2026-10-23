@@ -1,8 +1,8 @@
 /**
- * 奇门遁甲解释数据库 —— 供盘面「点击出解释」与解读引擎共用
+ * 奇门遁甲解释与格局识别数据库 —— 供盘面「点击出解释」、九宫评分与解读引擎共用
  *
  * 内容均为传统奇门通义文本（各派文字略有出入，取通行说法），
- * 只做解释性呈现，不产生新的排盘事实。
+ * 只做解释性呈现与确定性格局匹配，不产生主观臆断。
  */
 
 // ---------------------------------------------------------------- 十二长生
@@ -210,3 +210,147 @@ export const CHANG12_INFO = {
   胎: '新机暗孕，宜酝酿谋划、不露声色',
   养: '蓄养待时，宜休养生息、积厚发远',
 };
+
+// ---------------------------------------------------------------- Phase 2：20+ 奇门经典吉凶格局自动识别引擎
+
+const HE_PAIRS = new Set(['乙+庚', '庚+乙', '丙+辛', '辛+丙', '丁+壬', '壬+丁', '戊+癸', '癸+戊']);
+const WU_BU_YU_SHI = {
+  甲: '庚', 乙: '辛', 丙: '壬', 丁: '癸', 戊: '甲',
+  己: '乙', 庚: '丙', 辛: '丁', 壬: '戊', 癸: '己',
+};
+const SHI_GAN_MU = new Set(['丙戌', '壬辰', '癸未', '戊戌', '己丑', '丁丑']);
+const OPP_PALACE = { 1: 9, 9: 1, 2: 8, 8: 2, 3: 7, 7: 3, 4: 6, 6: 4 };
+const HOME_STAR = { 1: '天蓬', 2: '天芮', 3: '天冲', 4: '天辅', 6: '天心', 7: '天柱', 8: '天任', 9: '天英' };
+const HOME_DOOR = { 1: '休门', 2: '死门', 3: '伤门', 4: '杜门', 6: '开门', 7: '惊门', 8: '生门', 9: '景门' };
+
+/**
+ * 自动识别奇门遁甲九宫与全局吉凶格局（20+ 经典格）
+ * @param {{ palaces: Array, riGan: string, shiGan: string, shiGanzhi: string, zhiShiPalace: number, zhiFuPalace: number }} ctx
+ * @returns {{ byPalace: Record<number, Array<{name:string,type:'吉'|'凶',desc:string}>>, all: Array<{name:string,type:'吉'|'凶',palace:number|null,palaceName:string,desc:string}> }}
+ */
+export function detectQimenPatterns(ctx) {
+  const { palaces = [], riGan = '', shiGan = '', shiGanzhi = '' } = ctx;
+  const byPalace = {};
+  const all = [];
+
+  const addPalace = (p, name, type, desc) => {
+    if (!byPalace[p.id]) byPalace[p.id] = [];
+    if (byPalace[p.id].some((x) => x.name === name)) return;
+    byPalace[p.id].push({ name, type, desc });
+    all.push({ name, type, palace: p.id, palaceName: `${p.name}宫`, desc });
+  };
+
+  const addGlobal = (name, type, desc, palace = null, palaceName = '全局') => {
+    if (all.some((x) => x.name === name && x.palace === palace)) return;
+    all.push({ name, type, palace, palaceName, desc });
+  };
+
+  // 1) 全局时辰格局：五不遇时、时干入墓、星门伏吟/反吟
+  if (riGan && shiGan && WU_BU_YU_SHI[riGan] === shiGan) {
+    addGlobal('五不遇时', '凶', `时干${shiGan}克日干${riGan}且阴阳同性，传统称「五不遇时」，主事多阻逆、宜静守缓图。`);
+  }
+  if (shiGanzhi && SHI_GAN_MU.has(shiGanzhi)) {
+    addGlobal('时干入墓', '凶', `时柱${shiGanzhi}属于时干入墓，主所问之事气机潜藏、暂难明朗，宜核实细节、待机而动。`);
+  }
+
+  const p1 = palaces.find((p) => p.id === 1);
+  if (p1) {
+    if (p1.star === HOME_STAR[1]) {
+      addGlobal('九星伏吟', '凶', '九星归于本宫不动为「星伏吟」，主天时迟滞、事体宜守旧不宜妄动。');
+    } else if (p1.star === HOME_STAR[OPP_PALACE[1]]) {
+      addGlobal('九星反吟', '凶', '九星落入对冲之宫为「星反吟」，主事态反复迅速、成败易变。');
+    }
+    if (p1.door === HOME_DOOR[1]) {
+      addGlobal('八门伏吟', '凶', '八门归于本宫不动为「门伏吟」，主人事停滞、资金或进展缓慢，利守不利攻。');
+    } else if (p1.door === HOME_DOOR[OPP_PALACE[1]]) {
+      addGlobal('八门反吟', '凶', '八门落入对冲之宫为「门反吟」，主人事调动频繁、波折反复，急事反易有变。');
+    }
+  }
+
+  // 2) 逐宫格局识别
+  for (const p of palaces) {
+    if (p.isMiddle || !p.tianPan || !p.diPan) continue;
+    const pair = `${p.tianPan}+${p.diPan}`;
+
+    // —— 经典大吉格 ——
+    if (pair === '戊+丙') {
+      addPalace(p, '青龙返首', '吉', '甲子戊加丙奇，为奇门第一大吉格，利于谒贵、求财、开拓进取（逢迫墓刑则减力）。');
+    }
+    if (pair === '丙+戊') {
+      addPalace(p, '飞鸟跌穴', '吉', '丙奇加甲子戊，主谋事顺遂、坐享其成、百事洞彻大吉。');
+    }
+    if (p.isZhiShi && p.diPan === '丁') {
+      addPalace(p, '玉女守门', '吉', '值使门所落之宫地盘见丁奇，利和谈、宴聚、婚恋及隐秘筹划。');
+    }
+    if (p.isZhiShi && ['乙', '丙', '丁'].includes(p.tianPan)) {
+      addPalace(p, '三奇得使', '吉', `天盘${p.tianPan}奇加临值使${p.door}，主得贵人或关键门路相助，事可乘势而为。`);
+    }
+    if ((p.id === 3 && p.tianPan === '乙') || (p.id === 9 && p.tianPan === '丙') || (p.id === 7 && p.tianPan === '丁')) {
+      addPalace(p, '三奇升殿', '吉', `${p.tianPan}奇临${p.name}宫本位升殿，奇力倍增，利文书、求名、贵人扶助。`);
+    }
+    if (HE_PAIRS.has(pair)) {
+      addPalace(p, '奇仪相合', '吉', `天地盘${pair}相合，主和解投契、合作易成，但亦主牵绊留恋。`);
+    }
+    if (pair === '丙+丁' && p.door === '生门') {
+      addPalace(p, '天遁', '吉', '丙奇加丁奇合生门，得月精庇佑，利求财创业、上书见贵。');
+    }
+    if (pair === '乙+己' && p.door === '开门') {
+      addPalace(p, '地遁', '吉', '乙奇加己合开门，得日精庇佑，利建置立业、稳固根基。');
+    }
+    if (p.tianPan === '丁' && p.door === '休门' && p.shen === '太阴') {
+      addPalace(p, '人遁', '吉', '丁奇合休门太阴，得星精之蔽，利结交贵人、密谋说合。');
+    }
+    if (p.tianPan === '丙' && p.door === '生门' && p.shen === '九天') {
+      addPalace(p, '神遁', '吉', '丙奇合生门九天，气势高扬，利远行开拓、宣传造势。');
+    }
+    if (p.tianPan === '丁' && p.door === '杜门' && p.shen === '九地') {
+      addPalace(p, '鬼遁', '吉', '丁奇合杜门九地，利潜藏蓄势、暗中布局、调研守御。');
+    }
+    if (pair === '丁+戊') {
+      addPalace(p, '青龙转光', '吉', '丁奇加戊，主转危为安、升迁显达之吉象。');
+    }
+    if (pair === '戊+丁') {
+      addPalace(p, '青龙耀明', '吉', '戊加丁奇，利求名求利、拜见贵人。');
+    }
+
+    // —— 经典凶格 ——
+    if (pair === '乙+辛') {
+      addPalace(p, '青龙逃走', '凶', '乙奇加辛金，主财物耗散、合作离散、婚恋易生裂痕，宜守成防失。');
+    }
+    if (pair === '辛+乙') {
+      addPalace(p, '白虎猖狂', '凶', '辛金加乙奇，主锋芒外露、争执伤损，忌强行推进与正面冲突。');
+    }
+    if (pair === '丁+癸') {
+      addPalace(p, '朱雀投江', '凶', '丁奇加癸水，主文书沉没、音信迟滞、口舌是非，签约考学需反复核验。');
+    }
+    if (pair === '癸+丁') {
+      addPalace(p, '螣蛇夭矫', '凶', '癸水加丁奇，主虚惊反复、文书官非口舌缠绕，宜冷静核实。');
+    }
+    if (pair === '庚+丙') {
+      addPalace(p, '太白入荧', '凶', '庚金加丙火，主外部干扰或竞争压力突至，宜固守设防、以静制动。');
+    }
+    if (pair === '丙+庚') {
+      addPalace(p, '荧入太白', '凶', '丙火加庚金，主门户耗损、财物易失，宜收敛防耗、不宜盲目外求。');
+    }
+    if (pair === '庚+癸') {
+      addPalace(p, '大格', '凶', '庚加癸为大格，主道路阻隔、重大变动受挫，远行与大额决策宜缓。');
+    }
+    if (pair === '庚+壬') {
+      addPalace(p, '小格', '凶', '庚加壬为小格（移荡格），主流动不安、音信迷失，宜就近稳扎稳打。');
+    }
+    if (pair === '庚+己' || pair === '己+庚') {
+      addPalace(p, '刑格', '凶', `${pair}为刑格，主阻力生刑伤、词讼纠纷，凡事宜守正避讼。`);
+    }
+    if (p.tianPan === '丙' && (p.isZhiFu || (p.diMarks && p.diMarks.length > 0))) {
+      addPalace(p, '悖格', '凶', '丙奇加临值符或年月日时干，主次序紊乱、行事急躁生变，宜循规守矩。');
+    }
+    if (riGan && p.tianPan === riGan && p.diPan === '庚') {
+      addPalace(p, '飞干格', '凶', `天盘日干${riGan}加地盘庚，主客相伤、主动出击易遇强阻。`);
+    }
+    if (riGan && p.tianPan === '庚' && p.diPan === riGan) {
+      addPalace(p, '伏干格', '凶', `天盘庚加地盘日干${riGan}，外力压境、宜避其锋芒。`);
+    }
+  }
+
+  return { byPalace, all };
+}

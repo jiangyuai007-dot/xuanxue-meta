@@ -1,11 +1,7 @@
 /**
- * 云历史客户端（P0-2）——「我的报告」共用的数据层
+ * 云历史客户端（P0-2 & Phase 4）——「我的报告」与订单/退款共用的数据层
  *
- * 为什么单独成一个文件：排盘页（app.js）与「我的报告」页（mine.js）都要访问同一套
- * /api/reports 与账号接口。把会话令牌、请求封装收在这里，两边都不各写一份 fetch，
- * 避免字段/报错文案漂移。
- *
- * 会话：登录令牌存 localStorage['x-session-token']（与服务端 x-session-token 头对应）；
+ * 会话：登录令牌存 localStorage['xuanxue.session']（与服务端 x-session-token 头对应）；
  * 游客不需要令牌，由服务端 httpOnly cookie 认设备。
  * 所有报错都转成「用户可读中文」，页面只管直接把 message 显示出来。
  */
@@ -89,6 +85,9 @@
     register: (email, password) => api('/api/auth/register', { method: 'POST', body: { email, password } }),
     logout: () => api('/api/auth/logout', { method: 'POST' }),
     orders: () => api('/api/orders'),
+    refundOrder: (orderId, reason = '用户自助申请退款') =>
+      api('/api/order/' + encodeURIComponent(orderId) + '/refund', { method: 'POST', body: { reason } }),
+    reconcile: () => api('/api/pay/reconcile'),
 
     saveReport: ({ system, title = '', subtitle = '', payload }) =>
       api('/api/reports', { method: 'POST', body: { system, title, subtitle, payload } }),

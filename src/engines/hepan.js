@@ -12,12 +12,13 @@
 import { GAN, ZHI, WUXING, ZHI_WUXING } from '../core/ganzhi.js';
 import { ganRelation, analyzeGan, analyzeZhi } from '../core/relations.js';
 
-export const HEWAN_ENGINE_VERSION = '1.0.0';
+export const HEWAN_ENGINE_VERSION = '1.0.1';
 
 const KEYS4 = ['year', 'month', 'day', 'hour'];
 const LABEL4 = { year: '年', month: '月', day: '日', hour: '时' };
 const SIDE_LABEL = { a: '甲方', b: '乙方' };
 const SIDE_SHORT = { a: '甲', b: '乙' };
+const ZODIAC_TO_ZHI = { 鼠: 0, 牛: 1, 虎: 2, 兔: 3, 龙: 4, 蛇: 5, 马: 6, 羊: 7, 猴: 8, 鸡: 9, 狗: 10, 猪: 11 };
 
 const clamp = (n, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, Math.round(n)));
 const pct = (obj, e) => Number(obj?.[e] || 0);
@@ -64,6 +65,8 @@ function partyOf(facts, side, name) {
     short: SIDE_SHORT[side],
     zodiac: f.lunar?.zodiac || '',
     calendarLabel: f.lunar?.yearGanzhi ? `${f.lunar.yearGanzhi}年` : '',
+    yearZhi: p.year?.zhi || '',
+    yearZhiIndex: Number.isInteger(p.year?.zhiIndex) ? p.year.zhiIndex : -1,
     dayGanzhi: p.day?.name || '',
     dayGan: p.day?.gan || '',
     dayZhi: p.day?.zhi || '',
@@ -271,10 +274,10 @@ function wuxingDim(A, B) {
   };
 }
 
-/** 生肖与纳音：民俗向 */
+/** 生肖与纳音：民俗向（Phase 1 修复：使用年柱地支 yearZhiIndex 判定生肖关系，而非日支 dayZhiIndex） */
 function zodiacDim(A, B) {
-  const ia = A.dayZhiIndex >= 0 ? A.dayZhiIndex : ZHI.indexOf(A.zodiac);
-  const ib = B.dayZhiIndex >= 0 ? B.dayZhiIndex : ZHI.indexOf(B.zodiac);
+  const ia = A.yearZhiIndex >= 0 ? A.yearZhiIndex : (A.pills[0]?.zhiIndex >= 0 ? A.pills[0].zhiIndex : (ZODIAC_TO_ZHI[A.zodiac] ?? -1));
+  const ib = B.yearZhiIndex >= 0 ? B.yearZhiIndex : (B.pills[0]?.zhiIndex >= 0 ? B.pills[0].zhiIndex : (ZODIAC_TO_ZHI[B.zodiac] ?? -1));
   let ziScore = 0;
   let ziKind = '无特殊关系';
   if (ia >= 0 && ib >= 0) {
@@ -283,15 +286,15 @@ function zodiacDim(A, B) {
     if (HE.some(([x, y]) => (x === ZHI[ia] && y === ZHI[ib]) || (y === ZHI[ia] && x === ZHI[ib]))) {
       ziScore += 8;
       ziKind = '生肖六合';
-    } else if (SAN.some((g) => g.includes(ZHI[ia]) && g.includes(ZHI[ib]))) {
+    } else if (ia !== ib && SAN.some((g) => g.includes(ZHI[ia]) && g.includes(ZHI[ib]))) {
       ziScore += 5;
       ziKind = '生肖三合';
-    } else if (LIU_CHONG_PAIRS.some(([x, y]) => x === ZHI[ia] && y === ZHI[ib])) {
+    } else if (LIU_CHONG_PAIRS.some(([x, y]) => (x === ZHI[ia] && y === ZHI[ib]) || (y === ZHI[ia] && x === ZHI[ib]))) {
       ziScore -= 8;
       ziKind = '生肖相冲';
     } else {
       const HAI = [['子', '未'], ['丑', '午'], ['寅', '巳'], ['卯', '辰'], ['申', '亥'], ['酉', '戌']];
-      if (HAI.some(([x, y]) => x === ZHI[ia] && y === ZHI[ib])) {
+      if (HAI.some(([x, y]) => (x === ZHI[ia] && y === ZHI[ib]) || (y === ZHI[ia] && x === ZHI[ib]))) {
         ziScore -= 4;
         ziKind = '生肖相害';
       }
@@ -300,7 +303,7 @@ function zodiacDim(A, B) {
 
   let naScore = 0;
   let naKind = '—';
-  // pills 按下→顺序排列，索引 2 即日柱（合参只看日柱纳音，年柱纳音俗法多不取）
+  // pills 按年→月→日→时顺序排列，索引 2 即日柱
   const ea = nayinElement(A.pills[2]?.nayin);
   const eb = nayinElement(B.pills[2]?.nayin);
   if (ea && eb) {
@@ -361,10 +364,6 @@ export function computeHePan(p) {
   const dims = [dayDim(A, B), combineDim(A, B), wuxingDim(A, B), zodiacDim(A, B)];
   const dOf = (k) => dims.find((d) => d.dim === k) || { items: [], conflicts: [] };
 
-  // 指数 = 中性基准 50 + 各维偏移。
-  // 为什么不直接把四维原始分相加？因为跨盘配对天然会产生不少刑冲（8 支两两 28 对，
-  // 六冲/六害/六破各 6 对），线性相加会把每一对陌生组合都压到谷底、五档分不出差别。
-  // 加个基准并给各维不同缩放后：普通组合落在 45~60，合多冲少能上 75+，冲多合少落到 40 以下。
   const DIM_GAIN = { day: 0.8, combine: 0.6, wuxing: 0.8, zodiac: 0.8 };
   const offset = dims.reduce((s, d) => s + d.score * (DIM_GAIN[d.dim] ?? 0.8), 0);
   const raw = dims.map((d) => ({ dim: d.dim, score: d.score, weight: DIM_GAIN[d.dim] ?? 0.8 }));
@@ -398,8 +397,6 @@ export function computeHePan(p) {
     base: BASE_SCORE,
     offset,
     dimRaw: raw,
-    // dims 保留完整明细（含 items/lines），供 prompt 与本地兜底引用；
-    // dimSummary 才是给前端/摘要用的精简版，避免整包过大。
     dims,
     dimSummary: dims.map((d) => ({
       dim: d.dim, label: d.label, weight: d.weight, score: d.score, note: d.note,
@@ -413,7 +410,6 @@ export function computeHePan(p) {
     complement,
     headline,
     summary: `${A.name}${A.dayGanzhi}／${A.pills.map((x) => x.name).join(' ')}　×　${B.name}${B.dayGanzhi}／${B.pills.map((x) => x.name).join(' ')}；${headline}；合 ${heItems.length} 项，冲克刑害 ${conflicts.length} 项，五行互补 ${complement.length} 项。`,
-    // 供渲染层与 prompt 复用的对称信息
     symmetry: {
       aZodiac: A.zodiac,
       bZodiac: B.zodiac,

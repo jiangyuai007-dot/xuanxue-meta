@@ -1,5 +1,5 @@
 /**
- * templates/bazi —— 八字报告章节卡渲染（AI 版）
+ * templates/bazi —— 报告章节卡与整页渲染（AI / 本地同构版）
  *
  * 设计铁律：
  *   1. 版式在这里写死，AI 影响不到结构——AI 只喂 slot 文本，怎么排由这里说了算。
@@ -17,6 +17,14 @@ const esc = (s) =>
     .replace(/"/g, '&quot;');
 
 const CN_NUM = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+
+const SYS_REPORT_TITLE = {
+  bazi: '八字命理解读报告',
+  liuyao: '六爻卦象解读报告',
+  qimen: '奇门遁甲局象解读报告',
+  ziwei: '紫微斗数命理解读报告',
+  hepan: '八字合盘报告',
+};
 
 /** CSS（作用域前缀 rp-，不污染全局 style.css） */
 export const TEMPLATE_CSS = `
@@ -80,44 +88,41 @@ function renderLocked(chapter, price) {
  * 渲染一张章节卡
  * @param {object} chapter 章节定义（core/reportPlan.js）
  * @param {object} data    slot 数据（ai/index 产出，已过 parse 校验）
- * @param {{unlocked?:boolean, source?:string, gateSystem?:string}} opts
- *   gateSystem：合规网关的体系名（合盘章传 'hepan'，其余体系沿用 'bazi'）
+ * @param {{unlocked?:boolean, source?:string, gateSystem?:string, price?:string}} opts
+ *   gateSystem：合规网关的体系名（合盘章传 'hepan'，其余体系传对应体系名）
  */
 export function renderChapterCard(chapter, data = {}, opts = {}) {
   if (!opts.unlocked && chapter.free === false) return renderLocked(chapter, opts.price);
 
-  // —— 合规网关：AI 文案的唯一出口 ——
-  const parts = [];
-  if (data.headline) parts.push({ key: 'headline', text: data.headline });
-  if (data.summary) parts.push({ key: 'summary', text: data.summary });
-  for (const p of data.points || []) if (p?.d) parts.push({ key: 'point', text: p.d });
-  for (const a of data.advice || []) if (a) parts.push({ key: 'advice', text: a });
-  const gated = {};
+  // —— 合规网关：AI 文案的唯一出口（逐项独立过网关，防止多条 point 共用同一 key 互相覆盖） ——
   const gs = opts.gateSystem || 'bazi';
-  for (const p of parts) gated[p.key] = gate(p.text, { system: gs, section: chapter.key }).text;
+  const gText = (txt) => (txt ? gate(String(txt), { system: gs, section: chapter.key }).text : '');
 
-  const summaryParas = String(gated.summary || '')
+  const gatedHeadline = gText(data.headline);
+  const gatedSummary = gText(data.summary);
+  const gatedPoints = (data.points || []).map((p) =>
+    p?.d ? { t: gText(p.t || '要点'), d: gText(p.d) } : null
+  ).filter(Boolean);
+  const gatedAdvice = (data.advice || []).map((a) => gText(a)).filter(Boolean);
+
+  const summaryParas = String(gatedSummary || '')
     .split(/\n/)
     .map((s) => s.trim())
     .filter(Boolean)
     .map((s) => `<p>${esc(s)}</p>`)
     .join('');
 
-  const pointCards = (data.points || [])
-    .map((p) =>
-      p?.d
-        ? `<div class="rp-pt"><b>${esc(p.t || '要点')}</b><span>${esc(gated.point || '')}</span></div>`
-        : ''
-    )
+  const pointCards = gatedPoints
+    .map((p) => `<div class="rp-pt"><b>${esc(p.t || '要点')}</b><span>${esc(p.d || '')}</span></div>`)
     .join('');
 
   const basisHtml = (data.basis || []).length
     ? `<div class="rp-basis">依据溯源　<em>${esc(data.basis.join(' · '))}</em></div>`
     : '';
 
-  const adviceHtml = (data.advice || []).length
+  const adviceHtml = gatedAdvice.length
     ? `<div class="rp-adv"><span class="rp-adv-h">建议</span><ol>${
-        (data.advice || []).map((a) => `<li>${esc(a)}</li>`).join('')
+        gatedAdvice.map((a) => `<li>${esc(a)}</li>`).join('')
       }</ol></div>`
     : '';
 
@@ -126,7 +131,7 @@ export function renderChapterCard(chapter, data = {}, opts = {}) {
     <div class="rp-ch-h"><span class="rp-no">${no}</span><h3 class="rp-ch-t">${esc(chapter.title)}</h3>${
     chapter.free ? '<span class="rp-tag free">免费</span>' : '<span class="rp-tag">已解锁</span>'
   }</div>
-    ${gated.headline ? `<p class="rp-hd">${esc(gated.headline)}</p>` : ''}
+    ${gatedHeadline ? `<p class="rp-hd">${esc(gatedHeadline)}</p>` : ''}
     ${summaryParas ? `<div class="rp-sum">${summaryParas}</div>` : ''}
     ${pointCards ? `<div class="rp-pts">${pointCards}</div>` : ''}
     ${basisHtml}
@@ -137,35 +142,36 @@ export function renderChapterCard(chapter, data = {}, opts = {}) {
 /**
  * 整份报告页
  * @param {object} p
- * @param {{panHtml:string, chapters:Array, source:string, factPackId:string, system?:string}} p
+ * @param {{panHtml:string, chapters:Array, source:string, factPackId:string, system?:string, title?:string}} p
  */
 export function renderReportPage(p) {
-  const { panHtml = '', chapters = [], source = 'ai', factPackId = '', system = 'bazi', title = '八字命理解读报告' } = p;
+  const { panHtml = '', chapters = [], source = 'ai', factPackId = '', system = 'bazi', title } = p;
+  const pageTitle = title || SYS_REPORT_TITLE[system] || '命理解读报告';
   // 章节卡两种入参都吃：整页组装传 {chapter,data}，逐章产物传已渲染好的 html
   const cards = chapters
     .map((c) =>
       c.html
         ? c.html
-        : renderChapterCard(c.chapter, c.data, { unlocked: c.unlocked !== false, source: c.source })
+        : renderChapterCard(c.chapter, c.data, { unlocked: c.unlocked !== false, source: c.source, gateSystem: system })
     )
     .join('\n');
   const genAt = new Date().toLocaleString('zh-CN', { hour12: false });
   return `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)}</title>
+<title>${esc(pageTitle)}</title>
 <style>${TEMPLATE_CSS}</style>
 </head>
 <body><div class="rp-wrap">
   <div class="rp-hd-bar">
-    <h1>${esc(title)}</h1>
+    <h1>${esc(pageTitle)}</h1>
     <span class="rp-meta">生成于 ${esc(genAt)} · 事实包 ${esc(factPackId)}</span>
     <span class="rp-src">${esc(source === 'ai' ? 'AI 深度解读' : source === 'cache' ? 'AI（缓存）' : '本地规则解读')}</span>
   </div>
   ${panHtml}
   ${cards}
   ${DISCLAIMER_ENABLED ? `<div class="rp-meta" style="text-align:center;padding:16px 0">${esc(DISCLAIMER)}</div>` : ''}
-</div></body></html>`;
+</div><script src="/bazi-drill.js"></script></body></html>`;
 }
 
 export { esc as e };

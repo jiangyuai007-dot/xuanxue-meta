@@ -6,19 +6,14 @@
  *   - 邮箱 + 密码注册/登录；密码用 node:crypto scrypt 加盐哈希，绝不存明文
  *   - 会话令牌为 HMAC 签名串（与权益凭证共用服务端密钥），含过期时间
  *   - 同邮箱连续失败 5 次锁定 15 分钟，防暴力破解
- *   - 数据落 data/users.json（单机形态，多实例前需换共享存储）
- *
- * 边界（如实说明）：这是**单机轻量账号**，不是 OAuth / 手机验证码体系；
- * 忘记密码目前只能联系人工，未做邮件发信（需要 SMTP 凭据）。
+ *   - 数据经统一存储层（src/storage/db.js：支持 node:sqlite WAL 与原子 JSON CAS 合并）落盘 data/users.json
  */
 
 import crypto from 'node:crypto';
-import fs from 'node:fs';
 import path from 'node:path';
 import { getSecret } from '../commerce/entitle.js';
+import { DATA_DIR, readCollection, writeCollection } from '../storage/db.js';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '../..');
-const DATA_DIR = path.join(ROOT, 'data');
 const USER_FILE = path.join(DATA_DIR, 'users.json');
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 天
@@ -30,21 +25,11 @@ function b64url(buf) {
 }
 
 function loadUsers() {
-  try {
-    if (fs.existsSync(USER_FILE)) return JSON.parse(fs.readFileSync(USER_FILE, 'utf8'));
-  } catch {
-    /* ignore */
-  }
-  return [];
+  return readCollection('users');
 }
 
 function saveUsers(list) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(USER_FILE, JSON.stringify(list, null, 2), 'utf8');
-  } catch {
-    /* 落盘失败不阻塞 */
-  }
+  writeCollection('users', list);
 }
 
 function hashPassword(password, salt) {
@@ -171,5 +156,5 @@ export function getUserById(id) {
 /** 账号概览（后台用） */
 export function userStats() {
   const list = loadUsers();
-  return { total: list.length, locked: list.filter((u) => u.lockedUntil && Date.now() < u.lockedUntil).length };
+  return { total: list.length, locked: list.filter((u) => u.lockedUntil && Date.now() < u.lockedUntil).length, file: USER_FILE };
 }

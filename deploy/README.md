@@ -121,7 +121,7 @@ journalctl -u mingli -f          # 看实时日志
 ```bash
 # 本机 Git Bash 执行，每天一次或改版前执行
 ssh mingli@<服务器IP> 'tar czf - -C /opt/mingli/app \
-  data/users.json data/orders.json data/reports.json data/.secret 2>/dev/null' \
+  data/xuanxue.sqlite data/users.json data/orders.json data/reports.json data/chats.json data/.secret 2>/dev/null' \
   > backup-$(date +%F).tar.gz
 ```
 

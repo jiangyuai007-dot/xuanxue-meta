@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>紫微斗数 · 玄机</title>
+<meta name="theme-color" content="#241d14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="fonts/subset.css">
 </head>
@@ -45,6 +50,17 @@
         </div>
       </div>
 
+      <div class="fb-row">
+        <label for="calendar">历法</label>
+        <div class="fb-ctl">
+          <select aria-label="历法" id="calendar">
+            <option value="gregorian">公历</option>
+            <option value="lunar">农历</option>
+          </select>
+          <label class="leap" id="leap-wrap" style="display:none"><input aria-label="闰月" type="checkbox" id="isLeap"> 闰月</label>
+        </div>
+      </div>
+
       <div class="fb-row" id="row-datetime">
         <label id="lb2">出生时间</label>
         <div role="group" aria-labelledby="lb2" class="fb-ctl date-grid">
@@ -83,7 +99,7 @@
         <button id="btnSaveReport" disabled>保存到我的报告</button>
       </div>
     </div>
-    <div class="fb-hint" aria-live="polite" id="sysHint">命身宫 / 五行局 · 十四主星与四化 · 大限流年</div>
+    <div class="fb-hint" aria-live="polite" id="sysHint">公历/农历输入 · 命身宫 / 五行局 · 十四主星与四化 · 大限流年</div>
     <div class="fb-hint" aria-live="polite" style="color:var(--gold-ink)">未成年人请在监护人陪同下使用，付费内容需监护人同意。</div>
   </div>
   <div id="msg" aria-live="polite" class="msg"></div>
@@ -114,6 +130,7 @@
 
     <div id="chart" class="chart-stage" style="display:none"></div>
     <div id="warnings" class="warn" style="display:none"></div>
+    <div id="reportBody" class="rp-host" style="display:none"></div>
   </section>
 
   <aside class="rail rail-right">
@@ -141,5 +158,6 @@
 
 <script src="cloud-history.js?v=20261006a"></script>
 <script src="app.js?v=20260927d"></script>
+<script src="poster.js?v=20261022"></script>
 </body>
 </html>

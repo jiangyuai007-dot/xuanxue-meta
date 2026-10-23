@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * 我的报告页（P0-2 云历史）的页面控制层。
- * 数据访问统一走 web/cloud-history.js，这里只管：账号区、报告列表、订单弹层。
+ * 我的报告页（P0-2 云历史 & Phase 4 自助退款）的页面控制层。
+ * 数据访问统一走 web/cloud-history.js，这里只管：账号区、报告列表、订单弹层与自助退款。
  *
  * 可访问性沿用 P0-3 规范：label 全带 for、消息区 aria-live、按钮可键盘到达。
  */
@@ -10,6 +10,12 @@
 const $ = (id) => document.getElementById(id);
 const CH = window.CloudHistory;
 const SYS_NAME = { bazi: '八字', liuyao: '六爻', qimen: '奇门', ziwei: '紫微', hepan: '合盘' };
+const STATUS_LABEL = {
+  paid: '已支付',
+  refunded: '已退款',
+  pending: '待支付',
+  closed: '已关闭',
+};
 
 function msg(text, isErr) {
   const el = $('msg');
@@ -53,7 +59,6 @@ function renderAccount(me) {
   if (me) {
     const email = me.email || '';
     $('acctEmail').textContent = email;
-    // 头像取邮箱首字（@ 前的第一个有效字符），取不到就退回「玄」
     const head = (email.split('@')[0] || '').trim();
     $('acctAvatar').textContent = head ? head[0].toUpperCase() : '玄';
     $('mrLead').textContent = '已登录，下面列出云端保存的全部报告。换设备登录同一邮箱即可看到同一份历史。';
@@ -62,7 +67,6 @@ function renderAccount(me) {
   }
 }
 
-/** 分段切换「登录 / 注册」：同一时刻只留一套表单，且把另一套的已填内容清掉防误提交 */
 function switchAuthTab(which) {
   const toRegister = which === 'register';
   $('tabLogin').setAttribute('aria-selected', String(!toRegister));
@@ -71,7 +75,6 @@ function switchAuthTab(which) {
   $('formRegister').hidden = !toRegister;
   if (toRegister) { $('rgEmail').value = ''; $('rgPwd').value = ''; }
   else { $('lgEmail').value = ''; $('lgPwd').value = ''; }
-  // 焦点跟着走，键盘用户不用重新 Tab 一遍
   (toRegister ? $('rgEmail') : $('lgEmail')).focus();
 }
 
@@ -173,13 +176,8 @@ function renderList(items) {
   });
 }
 
-// ---------------------------------------------------------------- 我的订单
+// ---------------------------------------------------------------- 我的订单（含 Phase 4 自助退款闭环）
 
-/**
- * 订单弹层开关。
- * 注意：.xj-modal 本体是 display:none、只有 .show 才 display:flex，
- * 光设 hidden=false 是打不开的（P0-2 踩过：hidden 被作者样式吃掉）。
- */
 function setOrdersModal(open) {
   const modal = $('xjOrdersModal');
   if (!modal) return;
@@ -204,17 +202,51 @@ async function showOrders() {
     const d = await CH.orders();
     const list = d.orders || [];
     $('xjOrdersList').innerHTML = list.length
-      ? list.map((o) => `
+      ? list.map((o) => {
+          const oid = o.id || o.orderId || '';
+          const statusLabel = STATUS_LABEL[o.status] || o.status;
+          const refundBtn = o.canRefund
+            ? `<button type="button" class="mini" data-refund-id="${CH.escapeHtml(oid)}" style="margin-left:8px;">申请退款</button>`
+            : '';
+          return `
         <div class="xj-item">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
             <div class="t">${CH.escapeHtml(o.skuName || o.skuId || '订单')}</div>
-            <div style="color:var(--gold-ink);font-weight:700;">¥${Number(o.amount || 0).toFixed(2)}</div>
+            <div style="display:flex;align-items:center;">
+              <span style="color:var(--gold-ink);font-weight:700;">¥${Number(o.amount || 0).toFixed(2)}</span>
+              ${refundBtn}
+            </div>
           </div>
-          <div class="m">${CH.escapeHtml(o.status)} · ${CH.escapeHtml(CH.fmtTime(o.createdAt || o.paidAt || o.updatedAt))}
-            ${o.orderId ? ' · 单号 ' + CH.escapeHtml(o.orderId) : ''}</div>
-        </div>`).join('')
+          <div class="m">${CH.escapeHtml(statusLabel)} · ${CH.escapeHtml(CH.fmtTime(o.createdAt || o.paidAt || o.updatedAt))}
+            ${oid ? ' · 单号 ' + CH.escapeHtml(oid) : ''}
+            ${o.refundId ? ' · 退款单 ' + CH.escapeHtml(o.refundId) : ''}</div>
+        </div>`;
+        }).join('')
       : '<p style="color:var(--sub);font-size:13px;padding:12px 0;">还没有订单记录。</p>';
-    $('xjOrdersTotal').textContent = '¥' + list.reduce((a, o) => a + Number(o.amount || 0), 0).toFixed(2);
+
+    const paidSum = list
+      .filter((o) => o.status === 'paid')
+      .reduce((a, o) => a + Number(o.amount || 0), 0);
+    $('xjOrdersTotal').textContent = '¥' + paidSum.toFixed(2);
+
+    $('xjOrdersList').querySelectorAll('[data-refund-id]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const oid = btn.getAttribute('data-refund-id');
+        if (!oid) return;
+        if (!confirm(`确认对订单 ${oid} 申请退款？退款后对应解锁权益将立即回收。`)) return;
+        btn.disabled = true;
+        btn.textContent = '处理中…';
+        try {
+          await CH.refundOrder(oid, '用户订单中心自助申请退款');
+          msg(`订单 ${oid} 已完成退款`);
+          await showOrders();
+        } catch (e) {
+          btn.disabled = false;
+          btn.textContent = '申请退款';
+          alert(e.message || '退款失败');
+        }
+      });
+    });
   } catch (e) {
     $('xjOrdersList').innerHTML = '<p style="color:var(--red);font-size:13px;padding:12px 0;">' + CH.escapeHtml(e.message) + '</p>';
   }
@@ -234,9 +266,9 @@ async function showOrders() {
   $('tabLogin').addEventListener('click', () => switchAuthTab('login'));
   $('tabRegister').addEventListener('click', () => switchAuthTab('register'));
   $('btnLogout').addEventListener('click', async () => {
-    try { await CH.logout(); } catch { /* 令牌自校验，失败也按退出处理 */ }
+    try { await CH.logout(); } catch { /* ignore */ }
     CH.setToken('');
-    switchAuthTab('login'); // 退出后回到登录态，切回登录表单
+    switchAuthTab('login');
     await loadMe();
     await loadList();
     msg('已退出登录，现在保存的报告仅属于这台设备');
@@ -244,7 +276,6 @@ async function showOrders() {
   $('btnOrders').addEventListener('click', showOrders);
   $('xjOrdersClose').addEventListener('click', () => setOrdersModal(false));
   $('xjOrdersMask').addEventListener('click', () => setOrdersModal(false));
-  // 键盘可达：Esc 关弹层
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && $('xjOrdersModal') && !$('xjOrdersModal').hidden) setOrdersModal(false);
   });

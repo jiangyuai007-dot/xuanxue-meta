@@ -1,12 +1,15 @@
 /**
  * hepan-drill —— 合盘页运行时（双栏输入 + 排盘 + SSE 逐章报告）
  *
- * 说明：合盘是双命盘产品，表单结构与八字页不同，故不复用 app.js（避免它的 bazi
- * 表单绑定在缺元素时报错），这里自包含一套同样的交互流与口径。
+ * Phase 1 修复：
+ *   1. 统一 `localStorage['xuanxue.purchases']` 为与 `app.js` / `src/commerce/purchases.js` 完全一致的 Array 结构，
+ *      自动迁移旧版 Object 结构，彻底消除八字与合盘跨页切换时互相覆盖清空已购凭证的 Bug。
+ *   2. 修复 `buy()` 中未解包 `o.order.id` 的 Bug，并补齐分享卡 `reportToken` 鉴权参数。
  */
 
 const $ = (id) => document.getElementById(id);
 const System = 'hepan';
+let currentReportToken = '';
 
 /* ------------------------------------------------------------------ */
 /* 基础工具                                                             */
@@ -14,7 +17,7 @@ const System = 'hepan';
 
 async function api(path, body, method = 'POST', timeoutMs = 30000) {
   const opt = { method, headers: { 'Content-Type': 'application/json' } };
-  const ent = loadPurchases().entitlements || [];
+  const ent = entitlementsForHepan();
   if (ent.length) opt.headers['X-Entitlements'] = ent.join(',');
   if (body) opt.body = JSON.stringify(body);
   const ac = new AbortController();
@@ -79,34 +82,97 @@ const escapeHtml = (s) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /* ------------------------------------------------------------------ */
-/* 已购 / 权益凭证（与 bazi 页同口径：本机持久化，服务端验签）           */
+/* 已购 / 权益凭证（Phase 1 修复：与 app.js 统一使用标准 Array 结构）     */
 /* ------------------------------------------------------------------ */
+
+const PURCHASE_KEY = 'xuanxue.purchases';
+
+function normalizePurchases(raw) {
+  if (Array.isArray(raw)) return raw.filter((x) => x && typeof x === 'object');
+  if (raw && typeof raw === 'object') {
+    const migrated = [];
+    const ents = Array.isArray(raw.entitlements) ? raw.entitlements.filter(Boolean) : [];
+    for (const [sys, val] of Object.entries(raw)) {
+      if (sys === 'entitlements' || !Array.isArray(val) || !val.length) continue;
+      migrated.push({
+        skuId: `${sys}_migrated`,
+        skuName: '已解锁章节',
+        system: sys,
+        sectionKeys: val.filter((k) => typeof k === 'string'),
+        amount: 0,
+        paidAt: new Date().toISOString(),
+        entitlement: ents[0] || null,
+      });
+    }
+    for (let i = migrated.length ? 1 : 0; i < ents.length; i++) {
+      migrated.push({
+        skuId: 'entitlement_migrated',
+        skuName: '已购凭证',
+        system: 'hepan',
+        sectionKeys: [],
+        amount: 0,
+        paidAt: new Date().toISOString(),
+        entitlement: ents[i],
+      });
+    }
+    return migrated;
+  }
+  return [];
+}
 
 function loadPurchases() {
   try {
-    return JSON.parse(localStorage.getItem('xuanxue.purchases') || '{}');
+    const raw = JSON.parse(localStorage.getItem(PURCHASE_KEY));
+    const list = normalizePurchases(raw);
+    if (raw && !Array.isArray(raw) && typeof raw === 'object') {
+      savePurchases(list);
+    }
+    return list;
   } catch {
-    return {};
+    return [];
   }
 }
-function savePurchases(v) {
+
+function savePurchases(list) {
   try {
-    localStorage.setItem('xuanxue.purchases', JSON.stringify(v));
+    localStorage.setItem(PURCHASE_KEY, JSON.stringify(normalizePurchases(list)));
   } catch {
     /* ignore */
   }
 }
-function addPurchase(system, sectionKeys, entitlement) {
-  const p = loadPurchases();
-  const list = Array.isArray(p[system]) ? p[system] : [];
-  const keys = Array.isArray(sectionKeys) ? sectionKeys : [];
-  for (const k of keys) {
-    if (!list.includes(k)) list.push(k);
+
+function entitlementsForHepan() {
+  return [...new Set(loadPurchases().map((p) => p.entitlement).filter(Boolean))];
+}
+
+function purchasedKeysForHepan() {
+  const set = new Set();
+  for (const p of loadPurchases()) {
+    if (p.system === System && Array.isArray(p.sectionKeys)) {
+      p.sectionKeys.forEach((k) => set.add(k));
+    }
   }
-  p[system] = list;
-  p.entitlements = Array.isArray(p.entitlements) ? p.entitlements : [];
-  if (entitlement && !p.entitlements.includes(entitlement)) p.entitlements.push(entitlement);
-  savePurchases(p);
+  return [...set];
+}
+
+function addPurchase(system, sectionKeys, entitlement, orderMeta = {}) {
+  const list = loadPurchases();
+  const rec = {
+    orderId: orderMeta.orderId || ('hp_' + Date.now()),
+    skuId: orderMeta.skuId || 'hepan_unlock',
+    skuName: orderMeta.skuName || '合盘解锁',
+    system: system || System,
+    sectionKeys: Array.isArray(sectionKeys) ? sectionKeys : [],
+    amount: Number(orderMeta.amount || 0),
+    paidAt: new Date().toISOString(),
+    factPackId: PAN?.factPackId || null,
+    entitlement: entitlement || null,
+  };
+  if (rec.entitlement && list.some((p) => p.entitlement === rec.entitlement)) {
+    return;
+  }
+  list.unshift(rec);
+  savePurchases(list.slice(0, 50));
 }
 
 /* ------------------------------------------------------------------ */
@@ -125,7 +191,6 @@ function readParty(letter) {
   }
   o.isLeapMonth = !!o.isLeapMonth;
   o.calendar = o.calendar === 'lunar' ? 'lunar' : 'gregorian';
-  // 公历模式不接受农历闰月字段，避免把脏数据带进引擎
   if (o.calendar !== 'lunar') o.isLeapMonth = false;
   return o;
 }
@@ -147,7 +212,6 @@ function syncCalendarUi(letter) {
   if (wrap) wrap.style.display = cal && cal.value === 'lunar' ? '' : 'none';
 }
 
-/** 农历模式下闰月勾不上的时候，给用户一句人话 */
 function validateParties(pa, pb) {
   const bad = [];
   for (const [ix, p] of [['甲方', pa], ['乙方', pb]]) {
@@ -156,7 +220,6 @@ function validateParties(pa, pb) {
     if (!Number.isFinite(y) || y < 1900 || y > 2100) bad.push(`${ix}年份需在 1900-2100`);
     if ($(`${ix[0]}IsLeap`) && $(`${ix[0]}IsLeap`).checked) {
       const m = Number(p.month);
-      // 农历闰月只有 04/05/06/07 等少数月份会有，引擎侧本就按真月处理；这里只拦明显不存在的组合
       if (!(m >= 1 && m <= 12)) bad.push(`${ix}月份不合法`);
     }
   }
@@ -211,10 +274,9 @@ function pushPair(p) {
 /* 排盘                                                                */
 /* ------------------------------------------------------------------ */
 
-let PAN = null; // 最近一次合盘（含 factPackId）
-let lastHepanInput = null; // 最近一次合盘的入参（云历史只存这些，打开时重排）
+let PAN = null;
+let lastHepanInput = null;
 
-/** 云历史只存输入参数，不落整份报告；与 btnHtml/btnCard 同步开按钮 */
 function enableSaveReport() {
   const b = $('btnSaveReport');
   if (b) b.disabled = !lastHepanInput || !!b.dataset.busy;
@@ -236,9 +298,12 @@ async function saveHepanToMyReports() {
       subtitle: PAN && PAN.score !== undefined ? `契合指数 ${PAN.score} 分 · ${PAN.grade}` : '',
       payload: lastHepanInput,
     });
+    delete b.dataset.busy;
+    b.textContent = old;
     msg(`已保存到我的报告（${r.updated ? '更新原有记录' : '新记录'}）`);
     enableSaveReport();
   } catch (e) {
+    delete b.dataset.busy;
     b.textContent = old;
     enableSaveReport();
     msg(e && e.message ? e.message : '保存失败', true);
@@ -298,11 +363,14 @@ async function runPaipan() {
     enableSaveReport();
     msg(d.reused ? '已命中本机同组合盘，直接展示了排盘区。' : '合盘完成，可继续生成完整报告。');
 
-    // 记录到「最近合盘」
     const label = `${pa.year}-${pa.month}-${pa.day} ${pa.hour}:${pa.minute} × ${pb.year}-${pb.month}-${pb.day} ${pb.hour}:${pb.minute}`;
     const sub = `${names.a || '甲方'} × ${names.b || '乙方'}　${d.score} 分 ${d.grade}`;
     pushPair({ key: d.factPackId, label, sub, a: pa, b: pb, names });
     $('btnReport').disabled = false;
+    if ($('btnCard')) $('btnCard').disabled = false;
+    if (typeof window.__xjCollapseForm === 'function') {
+      window.__xjCollapseForm({ badge: '已合盘', summary: sub, onPoster: openHepanPoster, factPackId: d.factPackId, system: 'hepan', facts: d });
+    }
   } catch (e) {
     msg(friendlyError(e), true);
   } finally {
@@ -412,10 +480,12 @@ async function runReportSse(body) {
         markFallback(ev.data.key);
       } else if (ev.name === 'done') {
         setReportSrc(ev.data.source);
+        if (ev.data.reportToken) currentReportToken = ev.data.reportToken;
         if (ev.data.reportUrl) {
           $('btnHtml').disabled = false;
           $('btnHtml').onclick = () => window.open(ev.data.reportUrl, '_blank');
         }
+        if ($('btnCard')) $('btnCard').disabled = false;
       }
     }
   }
@@ -448,19 +518,20 @@ function consumeJsonReport(d) {
     null
   );
   renderSkus(d.skus);
+  if (d.reportToken) currentReportToken = d.reportToken;
   if (d.reportUrl) {
     $('btnHtml').disabled = false;
     $('btnHtml').onclick = () => window.open(d.reportUrl, '_blank');
   }
+  if ($('btnCard')) $('btnCard').disabled = false;
 }
 
 async function runReport() {
   if (!PAN || !PAN.factPackId) return msg('请先点「合盘」生成双方命盘。', true);
-  const p = loadPurchases();
   const body = {
     factPackId: PAN.factPackId,
-    purchased: Array.isArray(p[System]) ? p[System] : [],
-    entitlements: Array.isArray(p.entitlements) ? p.entitlements : [],
+    purchased: purchasedKeysForHepan(),
+    entitlements: entitlementsForHepan(),
   };
   msg('报告逐章生成中，请稍候…');
   try {
@@ -499,11 +570,18 @@ function renderSkus(skus) {
 
 async function buy(skuId, section) {
   try {
-    const o = await api('/api/order', { skuId, system: System, sectionKey: section || null });
-    const pay = await api(`/api/order/${o.id}/pay`, {});
+    const oRes = await api('/api/order', { skuId, system: System, sectionKey: section || null });
+    const ord = oRes.order || oRes;
+    const payRes = await api(`/api/order/${ord.id}/pay`, {});
+    const pay = payRes.order || payRes;
     if (!pay.entitlement && pay.payInfo) return msg('请按页面提示完成支付（当前为演示环境，一般立即成功）。', true);
     const keys = pay.sectionKey ? [pay.sectionKey] : ['ganzhi', 'riyu', 'wuxing', 'chongke', 'xiangchu'];
-    addPurchase(System, keys, pay.entitlement);
+    addPurchase(System, keys, pay.entitlement, {
+      orderId: ord.id,
+      skuId,
+      skuName: ord.skuName || '合盘解锁',
+      amount: ord.amount,
+    });
     msg('已解锁，重新点「完整报告」即可查看剩余章节。');
   } catch (e) {
     msg(friendlyError(e), true);
@@ -544,7 +622,7 @@ async function init() {
       sel.value = cur;
     }
   } catch {
-    /* 城市列表失败不阻塞：保留默认城市 */
+    /* ignore */
   }
 
   for (const al of ['a', 'b']) {
@@ -553,10 +631,24 @@ async function init() {
 
   $('btnPaipan').onclick = runPaipan;
   $('btnReport').onclick = runReport;
-  $('btnCard').onclick = () => {
-    if (!PAN || !PAN.factPackId) return msg('请先合盘。', true);
-    window.open(`/api/report/${PAN.factPackId}/sharecard.svg`, '_blank');
-  };
+
+function openHepanPoster() {
+  if (!PAN || !PAN.factPackId) return msg('请先合盘。', true);
+  if (typeof window.__xjOpenPosterModal === 'function') {
+    const names = (lastHepanInput && lastHepanInput.names) || {};
+    window.__xjOpenPosterModal({
+      system: 'hepan',
+      factPackId: PAN.factPackId,
+      reportToken: currentReportToken,
+      facts: PAN,
+      subHeader: `${names.a || '甲方'} × ${names.b || '乙方'} · 八字合盘契合度推演`,
+    });
+  } else {
+    window.open(`/api/report/${PAN.factPackId}/sharecard.svg?t=${encodeURIComponent(currentReportToken)}`, '_blank');
+  }
+}
+
+  $('btnCard').onclick = openHepanPoster;
   if ($('btnSaveReport')) $('btnSaveReport').onclick = saveHepanToMyReports;
 
   $('pairList').addEventListener('click', (e) => {

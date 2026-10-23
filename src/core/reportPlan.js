@@ -8,29 +8,28 @@
  *   1. 本文件只描述「结构」，不产出自然语言。文案一律由 AI 填 slot，或本地兜底。
  *   2. 版式由 report/templates/* 写死，AI 影响不到本文件的 slot 命名。
  *   3. 事实抽取只能取自 factpack 的 facts（本地确定性计算），严禁 AI 自行推算命理事实。
- *   4. needs 里写的字段名，必须能在 FACT_PRESETS 找到对应抽取器，否则视为配置错误。
+ *   4. needs 里写的字段名，必须能在 ALL_PRESETS 找到对应抽取器，否则视为配置错误。
  *
- * 章节顺序 = 产品侧指定顺序（命局 → 格局 → 性格 → 健康 → 感情 → 事业 → 财运 → 大运 → 神煞 → 称骨）
- * 六亲（qinyuan）按产品决策并入「感情婚姻」，不单独成章。
+ * Phase 2 升级：
+ *   全站五大体系（bazi / hepan / liuyao / qimen / ziwei）统一注册到 PLAN_TABLE，
+ *   全部走 /api/report/stream 逐章流式卡片（rp-ch）与 F1..Fn 事实编号溯源。
  */
 
 /** 模板协议版本：改动 slot 命名/结构时必须+1，用于让旧缓存自动失效 */
-export const PLAN_VERSION = '1.0.0';
+export const PLAN_VERSION = '1.1.0';
 
 /** 本地兜底引擎版本（AI 全挂时用它出文案，便于溯源） */
-export const FALLBACK_VERSION = 'local-bazi-1.0';
+export const FALLBACK_VERSION = 'local-all-2.0';
 
 // ------------------------------------------------------------------
-// 一、事实抽取器
+// 一、八字事实抽取器
 // ------------------------------------------------------------------
-// 每个抽取器：输入八字 facts，输出一段「带编号的纯事实文本」。
-// 一律只做搬运与截断，不做吉凶断言、不做解释。
 
 const NAMES = { year: '年', month: '月', day: '日', hour: '时' };
 const elPct = (pct) => Object.entries(pct || {}).map(([k, v]) => `${k}${v}%`).join(' ');
 
 /** 神煞按类别分组取前 N 条，避免整包 108 项全塞进 prompt */
-function shenshaLines(f, { limit = 24, keep = (s) => true } = {}) {
+function shenshaLines(f, { limit = 24, keep = () => true } = {}) {
   const list = (f.shensha || []).filter(keep).slice(0, limit);
   if (!list.length) return '本命盘未取到该类别神煞';
   return list
@@ -161,12 +160,236 @@ export const FACT_PRESETS = {
     `\n旬空：${(f.xunkong || []).join('、') || '—'}${f.xunkongPositions?.length ? `（落${f.xunkongPositions.join('、')}）` : ''}`,
 };
 
+// ------------------------------------------------------------------
+// 一之二、合盘事实抽取器
+// ------------------------------------------------------------------
+
+const hpList = (arr, limit = 20, map = (x) => (typeof x === 'string' ? x : x.name)) =>
+  (arr || []).slice(0, limit).map(map).filter(Boolean).join('；');
+
+const hpPartyLine = (p) =>
+  `${p.name}：${(p.pills || []).map((x) => x.name).join(' ')}　日柱 ${p.dayGanzhi}（日主${p.dayMasterElement}）　` +
+  `${p.strengthLevel || ''}　生肖${p.zodiac || ''}　纳音${(p.pills || [])[2]?.nayin || ''}`;
+
+const hpDimsLine = (f) =>
+  `合参维度：${(f.dims || [])
+    .map((d) => `${d.label} ${d.score > 0 ? '+' : ''}${d.score}/${d.weight}`)
+    .join('；')}`;
+
+export const FACT_PRESETS_HEPAN = {
+  hepanBasics: (f) =>
+    `两名命主：${(f.parties || []).map(hpPartyLine).join('\n')}` +
+    `\n契合指数：${f.score}（${f.grade}）　${f.gradeDesc || ''}` +
+    `\n${hpDimsLine(f)}` +
+    `\n合 ${(f.he || []).length} 项：${hpList(f.he)}　冲刑害破 ${(f.conflicts || []).length} 项：${hpList(f.conflicts)}`,
+
+  hepanCombine: (f) => {
+    const he = f.he || [];
+    const bad = f.conflicts || [];
+    const line = (r) => {
+      const who = r.keyText || `${r.from?.sideLabel || ''}${r.from?.pos || ''} ↔ ${r.to?.sideLabel || ''}${r.to?.pos || ''}`;
+      return `${r.name}（${who}）${r.note ? '，' + r.note : ''}${r.source ? '［' + r.source + '］' : ''}`;
+    };
+    return (
+      `相合相引：${he.length ? he.map(line).join('\n') : '未见相合之处'}` +
+      `\n需要注意：${bad.length ? bad.map(line).join('\n') : '未见冲刑害破'}`
+    );
+  },
+
+  hepanDay: (f) => {
+    const d = f.day || {};
+    return (
+      `甲方日柱：${f.parties?.[0]?.dayGanzhi || '—'}　乙方日柱：${f.parties?.[1]?.dayGanzhi || '—'}` +
+      `\n日柱关系：${hpList(d.items, 8)}` +
+      `\n维度分：${d.score}/${d.weight || 30}　权重最高，为合参核心`
+    );
+  },
+
+  hepanWuxing: (f) => {
+    const lines = (f.wuxing?.lines || [])
+      .map((l) => `${l.element}：甲${l.aPercent}%／乙${l.bPercent}%${l.aNeed ? '（甲方喜用）' : ''}${l.bNeed ? '（乙方喜用）' : ''}　${l.kind}`)
+      .join('；');
+    return `五行占比对照：${lines}\n互补项：${hpList(f.complement, 8, (x) => `${x.element}（${x.kind}）`)}`;
+  },
+
+  hepanConflict: (f) => {
+    const bad = f.conflicts || [];
+    if (!bad.length) return '柱位互动：双方未见明显冲刑害破，相处摩擦多来自日常而非盘面';
+    return `需要注意：${bad.map((r) => `${r.name}（${(r.keys || []).join('·')}）${r.note ? '，' + r.note : ''}`).join('\n')}`;
+  },
+
+  hepanAdvice: (f) =>
+    `${hpPartyLine(f.parties?.[0] || {})} ｜ ${hpPartyLine(f.parties?.[1] || {})}` +
+    `\n契合指数 ${f.score}（${f.grade}）\n相合 ${(f.he || []).length} 项：${hpList(f.he)}` +
+    `\n冲刑害破 ${(f.conflicts || []).length} 项：${hpList(f.conflicts)}` +
+    `\n${hpDimsLine(f)}`,
+};
+
+// ------------------------------------------------------------------
+// 一之三、六爻事实抽取器（Phase 2 新增）
+// ------------------------------------------------------------------
+
+const lyLineTag = (l) =>
+  `${l.position}：${l.gan || ''}${l.zhi || ''}（${l.zhiElement || ''}·${l.liuqin || ''}·${l.liushen || ''}·${l.wangshuai || ''}` +
+  `${l.isShi ? '·世' : ''}${l.isYing ? '·应' : ''}${l.isDong ? '·动' : ''}${l.xunkong ? '·空亡' : ''}${l.yuePo ? '·月破' : ''}` +
+  `${l.fuShow ? `·伏${l.fuLiuqin}${l.fuZhi}` : ''}）`;
+
+export const FACT_PRESETS_LIUYAO = {
+  liuyaoGua: (f) =>
+    `本卦：${f.benGua?.name || '—'}（${f.benGua?.upper || ''}上${f.benGua?.lower || ''}下，${f.benGua?.gong || ''}宫${f.benGua?.gongElement || ''}，${f.benGua?.generation || ''}卦）` +
+    `\n变卦：${f.bianGua?.name || '—'}（${f.bianGua?.upper || ''}上${f.bianGua?.lower || ''}下）` +
+    `\n四柱与空亡：月建${f.yueJian?.zhi || ''}（${f.yueJian?.element || ''}）｜日辰${f.riJian?.ganzhi || ''}｜旬空${(f.xunkong || []).join('、') || '—'}` +
+    `\n卦身：${f.guaShen?.zhi || '—'}（${f.guaShen?.source || ''}）`,
+
+  liuyaoYongshen: (f) => {
+    const ysLines = f.yongshenLines || [];
+    const fuMissing = (f.lines || []).filter((l) => l.fuShow);
+    return (
+      `所问事项：${f.question || '通用占问'}（分类：${f.category || 'general'}）` +
+      `\n取用神：${f.yongshen || '官鬼'}（${f.yongshenNote || ''}）` +
+      `\n用神爻位：${ysLines.length ? ysLines.map(lyLineTag).join('；') : '本卦未现，取伏神参看'}` +
+      (fuMissing.length ? `\n伏神提示：${fuMissing.map((l) => `${l.fuLiuqin}${l.fuGan}${l.fuZhi}伏于${l.position}${l.zhi}之下`).join('；')}` : '')
+    );
+  },
+
+  liuyaoShiYing: (f) => {
+    const lines = f.lines || [];
+    const shi = f.shiLine || lines[f.shiYing?.shi];
+    const ying = lines[f.shiYing?.ying];
+    return (
+      `世爻：${shi ? lyLineTag(shi) : f.shiYing?.shiPosition || '—'}` +
+      `\n应爻：${ying ? lyLineTag(ying) : f.shiYing?.yingPosition || '—'}` +
+      `\n六爻全列：${lines.map(lyLineTag).join('；')}`
+    );
+  },
+
+  liuyaoDongBian: (f) => {
+    const lines = f.lines || [];
+    const bian = f.bianLines || [];
+    const dong = lines.filter((l) => l.isDong);
+    if (!dong.length) {
+      return `动爻：本卦六爻皆静，无动爻发动，以本卦用神旺衰与世应生克定论\n本卦：${f.benGua?.name || '—'}｜变卦：${f.bianGua?.name || '—'}`;
+    }
+    return (
+      `动爻数量：${dong.length} 爻发动（${dong.map((d) => d.position).join('、')}）` +
+      `\n动变明细：${dong.map((d) => `${lyLineTag(d)} → 变${bian[d.index]?.zhi || ''}（${bian[d.index]?.zhiElement || ''}·${bian[d.index]?.liuqin || ''}）`).join('；')}`
+    );
+  },
+};
+
+// ------------------------------------------------------------------
+// 一之四、奇门事实抽取器（Phase 2 新增）
+// ------------------------------------------------------------------
+
+export const FACT_PRESETS_QIMEN = {
+  qimenBasics: (f) =>
+    `局象：${f.juName || ''}｜${f.yuan || ''}（${f.yuanBasis || ''}）｜盘式：${f.panMethod === 'fei' ? '飞盘' : '转盘'}` +
+    `\n节气：${f.solarTerm || ''}｜日柱${f.pillars?.ri?.ganzhi || ''}｜时柱${f.pillars?.shi?.ganzhi || ''}｜旬首${f.xunShou || ''}（${f.xunShouYi || ''}）` +
+    `\n值符：${f.zhiFu?.star || ''}落${f.zhiFu?.palaceName || ''}宫｜值使：${f.zhiShi?.door || ''}落${f.zhiShi?.palaceName || ''}宫` +
+    `\n空亡：时旬空${(f.kongWang || []).join('、') || '—'}｜马星：${f.maXing?.zhi || ''}落${f.maXing?.palaceName || '—'}宫`,
+
+  qimenGeju: (f) => {
+    const pats = f.patterns || [];
+    const sihai = (f.palaces || [])
+      .filter((p) => !p.isMiddle && (p.jiXing || p.ruMu || p.menPo || p.kongWang))
+      .map((p) => {
+        const flags = [p.jiXing ? '击刑' : '', p.ruMu ? '入墓' : '', p.menPo ? '门迫' : '', p.kongWang ? '空亡' : ''].filter(Boolean);
+        return `${p.name}宫（${p.tianPan || ''}+${p.diPan || ''}·${p.door || ''}）：${flags.join('、')}`;
+      });
+    return (
+      `命中格局：${pats.length ? pats.map((x) => `${x.name}［${x.type}，${x.palaceName || '全局'}］：${x.desc}`).join('；') : '本局未触发特殊大吉大凶格'}` +
+      `\n四害分布：${sihai.length ? sihai.join('；') : '九宫未见明显击刑入墓门迫'}`
+    );
+  },
+
+  qimenDirection: (f) => {
+    const fav = f.favorable || {};
+    const top3 = (f.ranking || []).slice(0, 3);
+    const dayP = (f.palaces || []).find((p) => p.tianPan === f.pillars?.ri?.gan);
+    const hourP = (f.palaces || []).find((p) => p.tianPan === f.pillars?.shi?.gan);
+    return (
+      `所测事由：${f.purpose?.name || '通用'}（${f.purpose?.note || ''}）` +
+      `\n最优吉方：${fav.direction || ''}方（${fav.palaceName || ''}宫，${fav.door || ''}·${fav.star || ''}，评分 ${fav.score ?? 0}，依据：${(fav.why || []).join('、')}）` +
+      `\n前三方位：${top3.map((r) => `${r.palaceName}宫(${r.direction}·${r.door}·${r.star}·${r.shen}:${r.score}分)`).join('；')}` +
+      `\n主客落宫：日干${f.pillars?.ri?.gan || ''}落${dayP?.name || f.zhiFu?.palaceName || '—'}宫｜时干${f.pillars?.shi?.gan || ''}落${hourP?.name || f.zhiFu?.palaceName || '—'}宫`
+    );
+  },
+
+  qimenPalaces: (f) =>
+    `九宫排布：\n` +
+    (f.palaces || [])
+      .filter((p) => !p.isMiddle)
+      .map(
+        (p) =>
+          `${p.name}宫（${p.direction}）：天盘${p.tianPan}+地盘${p.diPan}｜${p.door}·${p.star}·${p.shen}` +
+          `${p.changsheng ? `·长生${p.changsheng}` : ''}${p.isZhiFu ? '·值符' : ''}${p.isZhiShi ? '·值使' : ''}`
+      )
+      .join('\n'),
+};
+
+// ------------------------------------------------------------------
+// 一之五、紫微斗数事实抽取器（Phase 2 新增）
+// ------------------------------------------------------------------
+
+export const FACT_PRESETS_ZIWEI = {
+  ziweiBasics: (f) =>
+    `生辰四柱：${f.siZhu?.year || ''} ${f.siZhu?.month || ''} ${f.siZhu?.day || ''} ${f.siZhu?.hour || ''}｜农历${f.lunar?.yearGanzhi || ''}年${f.lunar?.isLeap ? '闰' : ''}${f.lunar?.month || ''}月${f.lunar?.day || ''}日（生肖${f.lunar?.zodiac || ''}）` +
+    `\n命宫：${f.mingGong?.zhi || ''}宫（${f.mingGong?.ganzhi || ''}）｜身宫：${f.shenGong?.zhi || ''}宫｜五行局：${f.wuXingJu?.name || ''}（${f.wuXingJu?.number || ''}岁起运）` +
+    `\n命主星：${f.mingZhu || '—'}｜身主星：${f.shenZhu || '—'}｜紫微坐${f.ziweiZhi || ''}宫｜天府坐${f.tianfuZhi || ''}宫` +
+    `\n生年四化：禄—${f.fourHua?.lu?.star || ''}　权—${f.fourHua?.quan?.star || ''}　科—${f.fourHua?.ke?.star || ''}　忌—${f.fourHua?.ji?.star || ''}`,
+
+  ziweiPalaces: (f) =>
+    `十二宫星曜：\n` +
+    Object.values(f.palaces || {})
+      .map((p) => {
+        const mains = (p.stars || []).filter((s) => s.kind === '主星').map((s) => `${s.name}${s.brightness ? `(${s.brightness})` : ''}${s.hua ? `[化${s.hua.label}]` : ''}`);
+        const fus = (p.stars || []).filter((s) => s.kind === '辅星').map((s) => `${s.name}${s.hua ? `[化${s.hua.label}]` : ''}`);
+        return `${p.name}（${p.ganzhi || p.zhi}）：主星${mains.join('、') || '空宫'}｜辅星${fus.join('、') || '无'}`;
+      })
+      .join('\n'),
+
+  ziweiSihua: (f) => {
+    const fh = f.fourHua || {};
+    const flyLines = Object.values(f.palaces || {})
+      .slice(0, 6)
+      .map((p) => {
+        const fl = p.flyHua;
+        if (!fl) return '';
+        return `${p.name}(${p.gan}干)飞化：禄入${fl.lu?.targetPalace || '—'}(${fl.lu?.star || ''})、忌入${fl.ji?.targetPalace || '—'}(${fl.ji?.star || ''}${fl.ji?.isSelf ? '·自化忌' : `·冲${fl.ji?.chongPalace || ''}`})`;
+      })
+      .filter(Boolean);
+    return (
+      `生年四化落宫：化禄${fh.lu?.star || ''}、化权${fh.quan?.star || ''}、化科${fh.ke?.star || ''}、化忌${fh.ji?.star || ''}` +
+      (flyLines.length ? `\n重点宫干飞化：${flyLines.join('；')}` : '')
+    );
+  },
+
+  ziweiDaXian: (f) => {
+    const dx = (f.daXian || []).slice(0, 8);
+    const cur = dx.find((d) => d.isCurrent) || dx[0];
+    return (
+      `当前虚岁：${f.xuAge || '—'}岁｜当前大限：${cur ? `${cur.ageStart}-${cur.ageEnd}岁行${cur.zhi}宫（${cur.ganzhi}，本命${cur.palace}）` : '—'}` +
+      `\n大限序列：${dx.map((d) => `${d.ageStart}-${d.ageEnd}岁${d.zhi}宫(${d.palace}·禄${d.sihua?.lu || ''}/忌${d.sihua?.ji || ''})`).join('；')}` +
+      `\n当前流年：${f.liuNian?.year || ''}年流年命宫在${f.liuNian?.mingGongZhi || ''}宫`
+    );
+  },
+};
+
+/** 全体系抽取器总表（单盘 + 合盘 + 六爻 + 奇门 + 紫微），buildFactLines 只认这张表 */
+export const ALL_PRESETS = {
+  ...FACT_PRESETS,
+  ...FACT_PRESETS_HEPAN,
+  ...FACT_PRESETS_LIUYAO,
+  ...FACT_PRESETS_QIMEN,
+  ...FACT_PRESETS_ZIWEI,
+};
+
 /**
  * 抽取某章的事实并编号（F1..Fn）
  * 编号即护栏：AI 的「依据溯源」只允许引用这里出现过的编号。
  * @param {string} chapterKey
  * @param {object} facts  factpack.facts
- * @param {string} [system] 体系（默认 bazi；合盘为 hepan）
+ * @param {string} [system] 体系（默认 bazi）
  * @returns {Array<{id:string, text:string}>}
  */
 export function buildFactLines(chapterKey, facts, system = 'bazi') {
@@ -176,7 +399,7 @@ export function buildFactLines(chapterKey, facts, system = 'bazi') {
   let n = 0;
   for (const need of ch.needs || []) {
     const pick = ALL_PRESETS[need];
-    if (!pick) continue; // 未知 preset 直接跳过，不报错（保证章节永远能生成）
+    if (!pick) continue;
     let text = '';
     try {
       text = pick(facts);
@@ -195,7 +418,7 @@ export function buildFactLines(chapterKey, facts, system = 'bazi') {
 }
 
 // ------------------------------------------------------------------
-// 二、八字章节注册
+// 二、章节注册表（五大体系）
 // ------------------------------------------------------------------
 
 /** 通用槽位片段（各章复用，减少重复定义） */
@@ -224,7 +447,16 @@ const SL = {
   }),
 };
 
-const A = (o) => o; // 可读性包装：A({...}) 让 slots 定义看起来像表格
+const A = (o) => o;
+
+const stdSlots = (hMax = 28, sMin = 160, sMax = 320) =>
+  A({
+    headline: SL.headline(hMax),
+    summary: SL.summary(sMin, sMax),
+    points: SL.points(3, 4),
+    basis: SL.basis(5),
+    advice: SL.advice(2, 3),
+  });
 
 export const BAZI_PLAN = [
   {
@@ -232,19 +464,9 @@ export const BAZI_PLAN = [
     title: '命局概览',
     order: 1,
     free: true,
-    // 实测：agnes-2.5-flash 强制思维链，一次完整章节约需 1000 completion tokens，
-    // 其中 reasoning_tokens 占 30-50%（探针实测 470/1003）。max_tokens 给小了会静默截断，
-    // 表现为「只吐得出 summary，points/basis/advice 全空」——极易误判成模型不支持 array。
-    // 故统一按 1400-2000 给，宁可富余也不截断。
     maxTokens: 1400,
     needs: ['fourPillars', 'dayMaster', 'strength', 'elementPercent', 'sanYuan'],
-    slots: A({
-      headline: SL.headline(26),
-      summary: SL.summary(160, 300),
-      points: SL.points(3, 4),
-      basis: SL.basis(5),
-      advice: SL.advice(2, 3),
-    }),
+    slots: stdSlots(26, 160, 300),
   },
   {
     key: 'geju',
@@ -253,13 +475,7 @@ export const BAZI_PLAN = [
     free: true,
     maxTokens: 1500,
     needs: ['pattern', 'yongshen', 'strength', 'elementPercent', 'changsheng'],
-    slots: A({
-      headline: SL.headline(28),
-      summary: SL.summary(180, 320),
-      points: SL.points(3, 4),
-      basis: SL.basis(5),
-      advice: SL.advice(2, 3),
-    }),
+    slots: stdSlots(28, 180, 320),
   },
   {
     key: 'xingge',
@@ -290,7 +506,7 @@ export const BAZI_PLAN = [
       basis: SL.basis(5),
       advice: (() => { const a = SL.advice(2, 3); a.desc = '2-3 条生活作息建议，绝不出现病症名、药材、诊疗建议；涉具体内容请指向专业机构'; return a; })(),
     }),
-    guard: 'health', // 触发更强的合规护栏（health 章额外追加禁止医疗结论的硬约束）
+    guard: 'health',
   },
   {
     key: 'ganqing',
@@ -298,7 +514,6 @@ export const BAZI_PLAN = [
     order: 5,
     free: false,
     maxTokens: 1600,
-    // 六亲（父母/兄弟/子女/祖上宫位）在此章一并给出，不再单列 qinyuan 章
     needs: ['fourPillars', 'relations', 'shishen', 'shenshaTaohua', 'sanYuan'],
     slots: A({
       headline: SL.headline(26),
@@ -345,13 +560,7 @@ export const BAZI_PLAN = [
     free: false,
     maxTokens: 2000,
     needs: ['dayun', 'liunian', 'yongshen', 'shishen'],
-    slots: A({
-      headline: SL.headline(28),
-      summary: SL.summary(200, 360),
-      points: SL.points(3, 4),
-      basis: SL.basis(5),
-      advice: SL.advice(2, 3),
-    }),
+    slots: stdSlots(28, 200, 360),
   },
   {
     key: 'shensha',
@@ -360,13 +569,7 @@ export const BAZI_PLAN = [
     free: false,
     maxTokens: 2000,
     needs: ['shensha'],
-    slots: A({
-      headline: SL.headline(24),
-      summary: SL.summary(180, 320),
-      points: SL.points(3, 4),
-      basis: SL.basis(5),
-      advice: SL.advice(2, 3),
-    }),
+    slots: stdSlots(24, 180, 320),
   },
   {
     key: 'chenggu',
@@ -385,86 +588,6 @@ export const BAZI_PLAN = [
   },
 ];
 
-// ------------------------------------------------------------------
-// 二之二、合盘章节注册（双命盘关系推演，P2）
-// ------------------------------------------------------------------
-
-/** 合盘事实抽取器：输入 engines/hepan 产出的 facts */
-// 注意默认取值：有的 items 是对象（关系项），有的是纯字符串（日柱说明），
-// 统一按「是字符串就用本身」取，别硬套 .name —— 那会让 [undefined].join('；') 静默变成空串。
-const hpList = (arr, limit = 20, map = (x) => (typeof x === 'string' ? x : x.name)) =>
-  (arr || []).slice(0, limit).map(map).filter(Boolean).join('；');
-
-const hpPartyLine = (p) =>
-  `${p.name}：${(p.pills || []).map((x) => x.name).join(' ')}　日柱 ${p.dayGanzhi}（日主${p.dayMasterElement}）　` +
-  `${p.strengthLevel || ''}　生肖${p.zodiac || ''}　纳音${(p.pills || [])[2]?.nayin || ''}`;
-
-const hpDimsLine = (f) =>
-  `合参维度：${(f.dims || [])
-    .map((d) => `${d.label} ${d.score > 0 ? '+' : ''}${d.score}/${d.weight}`)
-    .join('；')}`;
-
-export const FACT_PRESETS_HEPAN = {
-  /** 双方基本信息 + 指数 + 分档（总论章用） */
-  hepanBasics: (f) =>
-    `两名命主：${(f.parties || []).map(hpPartyLine).join('\n')}` +
-    `\n契合指数：${f.score}（${f.grade}）　${f.gradeDesc || ''}` +
-    `\n${hpDimsLine(f)}` +
-    `\n合 ${(f.he || []).length} 项：${hpList(f.he)}　冲刑害破 ${(f.conflicts || []).length} 项：${hpList(f.conflicts)}`,
-
-  /** 天干地支合参明细 */
-  hepanCombine: (f) => {
-    const he = f.he || [];
-    const bad = f.conflicts || [];
-    const line = (r) => {
-      // 三合/三会会聚合三柱以上，统一用 keyText（形如「甲方年柱／乙方月柱」），
-      // 不要用 from/to 拼——多柱关系下 from/to 是 null，拼出来会丢失柱位信息。
-      const who = r.keyText || `${r.from?.sideLabel || ''}${r.from?.pos || ''} ↔ ${r.to?.sideLabel || ''}${r.to?.pos || ''}`;
-      return `${r.name}（${who}）${r.note ? '，' + r.note : ''}${r.source ? '［' + r.source + '］' : ''}`;
-    };
-    return (
-      `相合相引：${he.length ? he.map(line).join('\n') : '未见相合之处'}` +
-      `\n需要注意：${bad.length ? bad.map(line).join('\n') : '未见冲刑害破'}`
-    );
-  },
-
-  /** 日柱与夫妻宫 */
-  hepanDay: (f) => {
-    const d = f.day || {};
-    return (
-      `甲方日柱：${f.parties?.[0]?.dayGanzhi || '—'}　乙方日柱：${f.parties?.[1]?.dayGanzhi || '—'}` +
-      `\n日柱关系：${hpList(d.items, 8)}` +
-      `\n维度分：${d.score}/${d.weight || 30}　权重最高，为合参核心`
-    );
-  },
-
-  /** 五行与用神互补 */
-  hepanWuxing: (f) => {
-    const lines = (f.wuxing?.lines || [])
-      .map((l) => `${l.element}：甲${l.aPercent}%／乙${l.bPercent}%${l.aNeed ? '（甲方喜用）' : ''}${l.bNeed ? '（乙方喜用）' : ''}　${l.kind}`)
-      .join('；');
-    return `五行占比对照：${lines}\n互补项：${hpList(f.complement, 8, (x) => `${x.element}（${x.kind}）`)}`;
-  },
-
-  /** 需要注意的刑冲害破 */
-  hepanConflict: (f) => {
-    const bad = f.conflicts || [];
-    if (!bad.length) return '柱位互动：双方未见明显冲刑害破，相处摩擦多来自日常而非盘面';
-    return `需要注意：${bad.map((r) => `${r.name}（${(r.keys || []).join('·')}）${r.note ? '，' + r.note : ''}`).join('\n')}`;
-  },
-
-  /** 相处建议素材（基础事实 + 结论项数量） */
-  hepanAdvice: (f) =>
-     `${hpPartyLine(f.parties?.[0] || {})} ｜ ${hpPartyLine(f.parties?.[1] || {})}` +
-    `\n契合指数 ${f.score}（${f.grade}）\n相合 ${(f.he || []).length} 项：${hpList(f.he)}` +
-    `\n冲刑害破 ${(f.conflicts || []).length} 项：${hpList(f.conflicts)}` +
-    `\n${hpDimsLine(f)}`,
-};
-
-/** 全体系抽取器总表（单盘 + 合盘），buildFactLines 只认这张表 */
-export const ALL_PRESETS = { ...FACT_PRESETS, ...FACT_PRESETS_HEPAN };
-
-/** 合盘六章（顺序：总论 → 干支 → 日柱 → 五行用神 → 刑冲 → 相处建议） */
 export const HEWAN_PLAN = [
   {
     key: 'hetong',
@@ -473,13 +596,7 @@ export const HEWAN_PLAN = [
     free: true,
     maxTokens: 1500,
     needs: ['hepanBasics'],
-    slots: A({
-      headline: SL.headline(28),
-      summary: SL.summary(180, 320),
-      points: SL.points(3, 4),
-      basis: SL.basis(5),
-      advice: SL.advice(2, 3),
-    }),
+    slots: stdSlots(28, 180, 320),
   },
   {
     key: 'ganzhi',
@@ -488,13 +605,7 @@ export const HEWAN_PLAN = [
     free: false,
     maxTokens: 1800,
     needs: ['hepanCombine'],
-    slots: A({
-      headline: SL.headline(28),
-      summary: SL.summary(180, 320),
-      points: SL.points(3, 4),
-      basis: SL.basis(5),
-      advice: SL.advice(2, 3),
-    }),
+    slots: stdSlots(28, 180, 320),
   },
   {
     key: 'riyu',
@@ -503,13 +614,7 @@ export const HEWAN_PLAN = [
     free: false,
     maxTokens: 1800,
     needs: ['hepanDay', 'hepanBasics'],
-    slots: A({
-      headline: SL.headline(28),
-      summary: SL.summary(200, 340),
-      points: SL.points(3, 4),
-      basis: SL.basis(5),
-      advice: SL.advice(2, 3),
-    }),
+    slots: stdSlots(28, 200, 340),
   },
   {
     key: 'wuxing',
@@ -518,13 +623,7 @@ export const HEWAN_PLAN = [
     free: false,
     maxTokens: 1600,
     needs: ['hepanWuxing', 'hepanBasics'],
-    slots: A({
-      headline: SL.headline(28),
-      summary: SL.summary(180, 320),
-      points: SL.points(3, 4),
-      basis: SL.basis(5),
-      advice: SL.advice(2, 3),
-    }),
+    slots: stdSlots(28, 180, 320),
   },
   {
     key: 'chongke',
@@ -557,6 +656,162 @@ export const HEWAN_PLAN = [
   },
 ];
 
+/** 六爻五章（顺序：卦象概览 → 用神分析 → 世应关系 → 动爻与变卦 → 趋势与建议） */
+export const LIUYAO_PLAN = [
+  {
+    key: 'overview',
+    title: '卦象概览',
+    order: 1,
+    free: true,
+    maxTokens: 1500,
+    needs: ['liuyaoGua'],
+    slots: stdSlots(28, 160, 300),
+  },
+  {
+    key: 'yongshen',
+    title: '用神分析',
+    order: 2,
+    free: true,
+    maxTokens: 1500,
+    needs: ['liuyaoYongshen', 'liuyaoGua'],
+    slots: stdSlots(28, 160, 300),
+  },
+  {
+    key: 'shiying',
+    title: '世应关系',
+    order: 3,
+    free: false,
+    maxTokens: 1600,
+    needs: ['liuyaoShiYing', 'liuyaoGua'],
+    slots: stdSlots(28, 180, 320),
+  },
+  {
+    key: 'dongyao',
+    title: '动爻与变卦',
+    order: 4,
+    free: false,
+    maxTokens: 1600,
+    needs: ['liuyaoDongBian', 'liuyaoGua'],
+    slots: stdSlots(28, 180, 320),
+  },
+  {
+    key: 'advice',
+    title: '趋势与建议',
+    order: 5,
+    free: false,
+    maxTokens: 1600,
+    needs: ['liuyaoYongshen', 'liuyaoShiYing', 'liuyaoDongBian'],
+    slots: stdSlots(28, 180, 320),
+  },
+];
+
+/** 奇门五章（顺序：盘式概览 → 四害与吉凶格局 → 用神方位 → 九宫要点 → 行动建议） */
+export const QIMEN_PLAN = [
+  {
+    key: 'overview',
+    title: '盘式概览',
+    order: 1,
+    free: true,
+    maxTokens: 1500,
+    needs: ['qimenBasics'],
+    slots: stdSlots(28, 160, 300),
+  },
+  {
+    key: 'geju',
+    title: '四害与吉凶格局',
+    order: 2,
+    free: true,
+    maxTokens: 1600,
+    needs: ['qimenGeju', 'qimenBasics'],
+    slots: stdSlots(28, 160, 300),
+  },
+  {
+    key: 'direction',
+    title: '用神方位',
+    order: 3,
+    free: false,
+    maxTokens: 1600,
+    needs: ['qimenDirection', 'qimenBasics'],
+    slots: stdSlots(28, 180, 320),
+  },
+  {
+    key: 'palace',
+    title: '九宫要点',
+    order: 4,
+    free: false,
+    maxTokens: 1800,
+    needs: ['qimenPalaces', 'qimenGeju'],
+    slots: stdSlots(28, 180, 340),
+  },
+  {
+    key: 'advice',
+    title: '行动建议',
+    order: 5,
+    free: false,
+    maxTokens: 1600,
+    needs: ['qimenDirection', 'qimenGeju', 'qimenBasics'],
+    slots: stdSlots(28, 180, 320),
+  },
+];
+
+/** 紫微六章（顺序：命盘概览 → 十二宫星曜 → 命宫与格局 → 生年四化 → 大限走势 → 流年提示） */
+export const ZIWEI_PLAN = [
+  {
+    key: 'overview',
+    title: '命盘概览',
+    order: 1,
+    free: true,
+    maxTokens: 1500,
+    needs: ['ziweiBasics'],
+    slots: stdSlots(28, 160, 300),
+  },
+  {
+    key: 'palaces',
+    title: '十二宫星曜',
+    order: 2,
+    free: true,
+    maxTokens: 1600,
+    needs: ['ziweiPalaces', 'ziweiBasics'],
+    slots: stdSlots(28, 160, 320),
+  },
+  {
+    key: 'pattern',
+    title: '命宫与格局',
+    order: 3,
+    free: false,
+    maxTokens: 1600,
+    needs: ['ziweiBasics', 'ziweiPalaces'],
+    slots: stdSlots(28, 180, 320),
+  },
+  {
+    key: 'fourhua',
+    title: '生年四化',
+    order: 4,
+    free: false,
+    maxTokens: 1600,
+    needs: ['ziweiSihua', 'ziweiBasics'],
+    slots: stdSlots(28, 180, 320),
+  },
+  {
+    key: 'dayun',
+    title: '大限走势',
+    order: 5,
+    free: false,
+    maxTokens: 1800,
+    needs: ['ziweiDaXian', 'ziweiBasics'],
+    slots: stdSlots(28, 180, 340),
+  },
+  {
+    key: 'liunian',
+    title: '流年提示',
+    order: 6,
+    free: false,
+    maxTokens: 1600,
+    needs: ['ziweiDaXian', 'ziweiSihua'],
+    slots: stdSlots(28, 180, 320),
+  },
+];
+
 // ------------------------------------------------------------------
 // 三、查询接口
 // ------------------------------------------------------------------
@@ -564,7 +819,9 @@ export const HEWAN_PLAN = [
 const PLAN_TABLE = {
   bazi: BAZI_PLAN,
   hepan: HEWAN_PLAN,
-  // 其余体系（六爻/奇门/紫微）迁移到同一协议时在此登记，见 P3
+  liuyao: LIUYAO_PLAN,
+  qimen: QIMEN_PLAN,
+  ziwei: ZIWEI_PLAN,
 };
 
 export const SUPPORTED_SYSTEMS = Object.keys(PLAN_TABLE);
@@ -606,7 +863,6 @@ function checkPlan(plan, system, errs) {
       if (def.type !== 'array' || !def.item) continue;
       const it = def.item;
       if (typeof it === 'object' && !Array.isArray(it)) {
-        // 对象形态（如 { t, d }）：至少得有一个子键，否则 schema 生成不出来
         if (Object.keys(it).length === 0) errs.push(`${system}:${ch.key}.${sk} item 是空对象`);
       } else if (it !== 'string' && !(it && it.type)) {
         errs.push(`${system}:${ch.key}.${sk} item 形态不合法（应为 'string' 或 {t,d} 对象）`);
@@ -615,7 +871,6 @@ function checkPlan(plan, system, errs) {
   }
   const keys = plan.map((c) => c.key);
   if (new Set(keys).size !== keys.length) errs.push(`${system} 存在重复章节 key`);
-  // order 必须连续（1..n），否则 SSE 逐章进度与卡片序号会错位
   const orders = plan.map((c) => c.order).sort((x, y) => x - y);
   orders.forEach((o, i) => {
     if (o !== i + 1) errs.push(`${system} order 不连续：${orders.join(',')}`);
@@ -626,7 +881,9 @@ export function planSelfCheck() {
   const errs = [];
   checkPlan(BAZI_PLAN, 'bazi', errs);
   checkPlan(HEWAN_PLAN, 'hepan', errs);
-  // 八字仍固定 2 免费章（用户拍板）；合盘只放总论 1 章免费用作引流
+  checkPlan(LIUYAO_PLAN, 'liuyao', errs);
+  checkPlan(QIMEN_PLAN, 'qimen', errs);
+  checkPlan(ZIWEI_PLAN, 'ziwei', errs);
   const free = BAZI_PLAN.filter((c) => c.free).map((c) => c.key);
   if (free.length !== 2) errs.push(`八字免费章数量应为 2，当前 ${free.length}: ${free.join(',')}`);
   const freeHp = HEWAN_PLAN.filter((c) => c.free).map((c) => c.key);

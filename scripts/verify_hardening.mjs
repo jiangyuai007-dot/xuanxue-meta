@@ -6,7 +6,10 @@
  */
 import fs from 'node:fs';
 import http from 'node:http';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.argv[2] || 8787);
 const B = `http://127.0.0.1:${PORT}`;
 const out = [];
@@ -83,11 +86,11 @@ const good = { type: 'bazi', year: 1990, month: 3, day: 15, hour: 14, minute: 30
   step('缓存文件数在治理上限内', health.cache.files <= 600, `files=${health.cache.files} bytes=${(health.cache.bytes / 1048576).toFixed(1)}MB`);
 
   // 7) 日志落盘
-  const logDir = 'E:/WorkBuddy/xuanxue-meta/data/logs';
+  const logDir = path.join(ROOT, 'data/logs');
   const hasLog = fs.existsSync(logDir) && fs.readdirSync(logDir).length > 0;
   step('访问/错误日志已落盘', hasLog, hasLog ? fs.readdirSync(logDir).join(',') : '目录为空');
 
-  fs.writeFileSync('E:/WorkBuddy/xuanxue-meta/.tail.log', out.join('\n'));
+  fs.writeFileSync(path.join(ROOT, '.tail.log'), out.join('\n'));
   const fails = results.filter((r) => !r.ok).length;
   console.log(out.join('\n'));
   console.log(`\n加固复验：${results.length - fails}/${results.length} 通过`);

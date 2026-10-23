@@ -407,6 +407,52 @@ ok('Z7', '十二宫齐全且命宫/身宫标记一致', () => {
   const shen = Object.values(r.palaces).find((p) => p.isShen);
   return ming.zhi === r.mingGong.zhi && shen.zhi === r.shenGong.zhi ? true : '标记不一致';
 });
+ok('Z8', 'Phase1修复：紫微身主按生年地支起，非 undefined（甲辰年身主为天机）', () => {
+  const r = build({ type: 'ziwei', year: 2024, month: 9, day: 3, hour: 6, gender: 'male', city: '北京' }).facts;
+  return r.shenZhu === '天机' && !!r.mingZhu ? true : `mingZhu=${r.mingZhu} shenZhu=${r.shenZhu}`;
+});
+ok('Z9', 'Phase1修复：紫微支持农历输入与字符串生辰收敛', () => {
+  const r = build({ type: 'ziwei', calendar: 'lunar', year: '1990', month: '4', day: '26', hour: '14', minute: '30', gender: 'male', city: '北京' }).facts;
+  return r.shenZhu === '火星' && r.lunar.month === 4 && r.lunar.day === 26 ? true : JSON.stringify({ shenZhu: r.shenZhu, lunar: r.lunar });
+});
+ok('Z10', 'Phase1修复：紫微晚子时（23:30）农历日顺延，与四柱日干支对齐', () => {
+  const rDay = computeZiwei({ year: 1990, month: 5, day: 20, hour: 12, minute: 0, gender: 'male', city: '北京', useTrueSolarTime: false });
+  const rLateZi = computeZiwei({ year: 1990, month: 5, day: 20, hour: 23, minute: 30, gender: 'male', city: '北京', useTrueSolarTime: false });
+  return rLateZi.lunar.day === rDay.lunar.day + 1 ? true : `12:00日=${rDay.lunar.day} 23:30日=${rLateZi.lunar.day}`;
+});
+ok('F8', 'Phase1修复：已购凭证兼容合盘旧 Object 格式并无损迁移为标准 Array', () => {
+  _store.clear();
+  _store.set('xuanxue.purchases', JSON.stringify({ hepan: ['ganzhi', 'riyu'], entitlements: ['tok_hp_1'] }));
+  const migrated = loadPurchases();
+  const keys = purchasedKeysFor('hepan');
+  return Array.isArray(migrated) && migrated.length === 1 && keys.includes('ganzhi') && keys.includes('riyu') && migrated[0].entitlement === 'tok_hp_1'
+    ? true
+    : JSON.stringify({ migrated, keys });
+
+  // Phase 2 新增回归测试
+  ok('Z11', 'Phase2精进：紫微火铃按全书口诀精确安放（寅午戌年子时火在丑、铃在卯）', () => {
+    const zw = computeZiwei({ year: 1990, month: 6, day: 15, hour: 0, minute: 10, gender: 'male', city: '北京', useTrueSolarTime: false });
+    return zw.fuStarPositions['火星'] === '丑' && zw.fuStarPositions['铃星'] === '卯' ? true : JSON.stringify(zw.fuStarPositions);
+  });
+  ok('Z12', 'Phase2精进：紫微十二宫宫干四化飞星矩阵（palaceSihua）完整且含冲宫', () => {
+    const zw = computeZiwei({ year: 2024, month: 6, day: 15, hour: 10, minute: 0, gender: 'male', city: '北京' });
+    return zw.palaceSihua && Object.keys(zw.palaceSihua).length === 12 && !!zw.palaceSihua['命宫']?.ji?.chongPalace;
+  });
+  ok('B13', 'Phase2精进：奇门真置闰法（含上元符头与超神/接气）与飞盘奇门九宫飞布', () => {
+    const qz = computeQimen({ year: 2026, month: 6, day: 7, hour: 10, minute: 0, city: '北京', juMethod: 'zhirun', panType: 'fei' });
+    const mid = qz.palaces.find((p) => p.id === 5);
+    return qz.panMethod === 'fei' && !!qz.zhirunInfo?.shangYuanFuTou && !!mid?.tianPan && Array.isArray(qz.patterns);
+  });
+  ok('B14', 'Phase2精进：八字六柱同参（computeSixPillarImpact 识别岁运并临与天克地冲）', () => {
+    const bz = computeBazi({ type: 'bazi', year: 1990, month: 5, day: 20, hour: 14, minute: 30, gender: 'male', city: '北京' });
+    const six = computeSixPillarImpact(bz.fourPillars, { ganIndex: 0, zhiIndex: 0, name: '甲子' }, { ganIndex: 0, zhiIndex: 0, name: '甲子', year: 2044 });
+    return six.specials.some((x) => x.type === 'binglin') && six.specials.some((x) => x.type === 'tkdc');
+  });
+  ok('C12', 'Phase2精进：ReportPlan 覆盖五大体系（bazi/hepan/liuyao/qimen/ziwei）且自检零错误', () => {
+    const errs = planSelfCheck();
+    return errs.length === 0 && SUPPORTED_SYSTEMS.length === 5 ? true : errs.join('; ');
+  });
+});
 
 console.log('\n【E 组】端到端（异步）');
 

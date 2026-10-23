@@ -1,5 +1,5 @@
 /**
- * 奇门遁甲排盘引擎 —— 时家奇门 · 转盘 · 拆补法（设计文档 D5）
+ * 奇门遁甲排盘引擎 —— 时家奇门 · 转盘/飞盘 · 拆补法/置闰法/茅山法（Phase 2 专业升级版）
  * 确定性排盘，只产事实；吉凶评价为规则化打分，非绝对断言。
  */
 
@@ -8,8 +8,8 @@ import { resolveDateTime } from '../core/time.js';
 import { solarTerm, SOLAR_TERMS } from '../core/astro.js';
 import { GAN, ZHI, GAN_WUXING, ZHI_WUXING, ganzhiOfJdn, indexOfGanzhi, CANGGAN } from '../core/ganzhi.js';
 import { xunkongOf } from './liuyao.js';
-import { computePillars } from './bazi.js';
-import { JI_XING, RU_MU, isMenPo, changshengOf, CHANG12_INFO } from '../core/qimenInfo.js';
+import { computePillars, normalizeInput } from './bazi.js';
+import { JI_XING, RU_MU, isMenPo, changshengOf, CHANG12_INFO, detectQimenPatterns } from '../core/qimenInfo.js';
 
 const WU_SHU_DUN = { 0: 0, 5: 0, 1: 2, 6: 2, 2: 4, 7: 4, 3: 6, 8: 6, 4: 8, 9: 8 };
 
@@ -31,11 +31,14 @@ const DI_SEQ = ['戊', '己', '庚', '辛', '壬', '癸', '丁', '丙', '乙']; 
 const STAR_HOME = { 1: '天蓬', 2: '天芮', 3: '天冲', 4: '天辅', 5: '天禽', 6: '天心', 7: '天柱', 8: '天任', 9: '天英' };
 const STAR_ORDER = ['天蓬', '天芮', '天冲', '天辅', '天心', '天柱', '天任', '天英'];
 const STAR_HOME8 = [1, 2, 3, 4, 6, 7, 8, 9];
+/** 飞盘九星序（按洛书 1..9 本宫星名排列，中五天禽独立参飞） */
+const FEI_STAR_ORDER = ['天蓬', '天芮', '天冲', '天辅', '天禽', '天心', '天柱', '天任', '天英'];
 
 const DOOR_HOME = { 1: '休门', 2: '死门', 3: '伤门', 4: '杜门', 5: null, 6: '开门', 7: '惊门', 8: '生门', 9: '景门' };
 const DOOR_ORDER = ['休门', '生门', '伤门', '杜门', '景门', '死门', '惊门', '开门'];
+/** 飞盘八门序（按洛书八宫 1,2,3,4,6,7,8,9 本位门排列） */
+const FEI_DOOR_ORDER = ['休门', '死门', '伤门', '杜门', '开门', '惊门', '生门', '景门'];
 
-// 八神统一用标准序：符·蛇·阴·六·白·玄·地·天（阴遁不再用勾陈/朱雀，避免与白虎/玄武混淆）
 const SHEN_YANG = ['值符', '螣蛇', '太阴', '六合', '白虎', '玄武', '九地', '九天'];
 const SHEN_YIN = ['值符', '螣蛇', '太阴', '六合', '白虎', '玄武', '九地', '九天'];
 
@@ -77,7 +80,8 @@ const PURPOSE = {
  * 主入口
  */
 export function computeQimen(input) {
-  const dt = resolveDateTime(input);
+  const src = normalizeInput(input);
+  const dt = resolveDateTime(src);
   const gy = jdnToYmd(Math.floor(dt.jdUtc + 0.5)).year;
 
   // 当前节气（二十四节气全列）
@@ -113,20 +117,61 @@ export function computeQimen(input) {
   const hourGzIndex = indexOfGanzhi(hourGanIndex, hourZhiIndex);
   const hourGz = { gan: GAN[hourGanIndex], zhi: ZHI[hourZhiIndex], name: GAN[hourGanIndex] + ZHI[hourZhiIndex], index: hourGzIndex };
 
-  // 三元与局数：拆补 / 置闰 / 茅山 / 自选局数
+  // Phase 2 精进：三元与局数 —— 严格区分 拆补法 / 真置闰法（正授·超神·接气·芒种大雪置闰） / 茅山法 / 自选局数
   const juMethod = input.juMethod || 'chaibu';
   const fuTouIndex = Math.floor(riGz.index / 5) * 5;
+  const fuTouName = GAN[fuTouIndex % 10] + ZHI[fuTouIndex % 12];
   let yuanIdx = (Math.floor(riGz.index / 5)) % 3;
-  let yuanBasis = `拆补法：日柱${riGz.name}，符头${GAN[fuTouIndex % 10]}${ZHI[fuTouIndex % 12]}，三元顺推`;
-  if (juMethod === 'zhirun' || juMethod === 'maoshan') {
+  let effectiveTermIdx = curTerm.index;
+  let zhirunInfo = null;
+  let yuanBasis = `拆补法：日柱${riGz.name}，符头${fuTouName}，三元顺推`;
+
+  if (juMethod === 'zhirun') {
+    // 置闰法：以甲子(0)、己卯(15)、甲午(30)、己酉(45) 四大符头为上元首日（index % 15 === 0）
+    const tzOffset = dt.tzOffset ?? 8;
+    const termDayNumber = Math.floor(curTerm.jdUtc + tzOffset / 24 + 0.5);
+    const termDayGz = ganzhiOfJdn(termDayNumber);
+    const termCycleOffset = termDayGz.index % 15; // 交节当日距最近大符头的天数 (0..14)
+    const cycleOffset = riGz.index % 15;          // 当前日距最近大符头的天数 (0..14)
+    const shangYuanDay = dayNumber - cycleOffset;
+    const shangYuanGz = ganzhiOfJdn(shangYuanDay);
+    yuanIdx = Math.floor(cycleOffset / 5);
+
+    // 交节与上元大符头的日差：正值=超神（符头先至），0=正授，负值=接气（节气先至）
+    const diffDays = termDayNumber - shangYuanDay;
+    let state = '正授';
+    let isLeapYuan = false;
+    // 芒种(index=8) 或 大雪(index=20) 超神满 9 日及以上时，置闰叠用上一节气（小满=7 / 小雪=19）三元
+    if ((curTerm.index === 8 || curTerm.index === 20) && termCycleOffset >= 9 && (dayNumber - (termDayNumber - termCycleOffset)) < 15) {
+      effectiveTermIdx = curTerm.index - 1;
+      state = '置闰';
+      isLeapYuan = true;
+    } else if (diffDays > 0) {
+      state = `超神${diffDays}日`;
+    } else if (diffDays < 0) {
+      state = `接气${Math.abs(diffDays)}日`;
+    }
+    zhirunInfo = {
+      state,
+      diffDays,
+      isLeapYuan,
+      shangYuanFuTou: shangYuanGz.name,
+      currentFuTou: fuTouName,
+      effectiveTerm: SOLAR_TERMS[effectiveTermIdx],
+    };
+    yuanBasis = isLeapYuan
+      ? `置闰法：${curTerm.name}超神满${termCycleOffset}日，置闰叠用${SOLAR_TERMS[effectiveTermIdx]}三元（符头${fuTouName}）`
+      : `置闰法：上元符头${shangYuanGz.name}（${state}），本旬符头${fuTouName}`;
+  } else if (juMethod === 'maoshan') {
     const daysSince = Math.max(0, Math.floor(dt.jdUtc - curTerm.jdUtc));
     yuanIdx = Math.min(2, Math.floor(daysSince / 5));
-    yuanBasis = `${juMethod === 'zhirun' ? '置闰法' : '茅山法'}：${curTerm.name}交节后第 ${daysSince + 1} 天，五日一元`;
+    yuanBasis = `茅山法：${curTerm.name}交节后第 ${daysSince + 1} 天，满五日换一元`;
   }
+
   const yuanName = ['上元', '中元', '下元'][yuanIdx];
 
   // 阴阳遁与局数
-  const ti = curTerm.index;
+  const ti = effectiveTermIdx;
   const isYang = !(ti >= 11 && ti <= 22);
   const juTable = JU_TABLE[ti] || [1, 7, 4];
   let ju = juTable[yuanIdx];
@@ -135,8 +180,9 @@ export function computeQimen(input) {
     yuanBasis = `自选局数：${ju} 局（三元按拆补推）`;
   }
   const forward = isYang;
+  const isFeiPan = input.panType === 'fei';
 
-  // 地盘三奇六仪
+  // 地盘三奇六仪（转盘与飞盘共用洛书九宫顺逆布戊己庚辛壬癸丁丙乙）
   const diPan = {};
   const seq = rotate(SEQ9, ju, forward, 9);
   seq.forEach((p, i) => {
@@ -167,34 +213,13 @@ export function computeQimen(input) {
   }
   if (sgPalace === null) sgPalace = vfPalace;
 
-  // 天盘干：地盘干整体旋转，使旬首仪落于时干宫
-  const offset = stepsBetween(SEQ9, vfPalace, sgPalace, forward);
-  const tianPan = {};
-  for (const p of SEQ9) {
-    const n = SEQ9.length;
-    const i = SEQ9.indexOf(p);
-    const back = SEQ9[(((i - (forward ? offset : -offset)) % n) + n) % n];
-    tianPan[p] = diPan[back];
-  }
-
   // 中宫寄宫：寄坤二宫 / 阳遁寄艮八、阴遁寄坤二
   const jiGong = input.jiGong === 'yangGenYinKun' ? (isYang ? 8 : 2) : 2;
   const jiGongName = input.jiGong === 'yangGenYinKun' ? `阳${isYang ? '遁寄艮八' : '阴遁寄坤二'}` : '寄坤二宫';
   const vfPalace8 = vfPalace === 5 ? jiGong : vfPalace;
   const sgPalace8 = sgPalace === 5 ? jiGong : sgPalace;
 
-  // 天盘九星（八宫，天禽寄坤）
-  const zhiFuStarHome = STAR_HOME[vfPalace] === '天禽' ? '天芮' : STAR_HOME[vfPalace];
-  const starOffset = stepsBetween(SEQ8, STAR_HOME8[STAR_ORDER.indexOf(zhiFuStarHome)], sgPalace8, forward);
-  const tianStar = {};
-  SEQ8.forEach((p) => {
-    const n = SEQ8.length;
-    const i = SEQ8.indexOf(p);
-    const back = SEQ8[(((i - (forward ? starOffset : -starOffset)) % n) + n) % n];
-    tianStar[p] = STAR_HOME[back];
-  });
-
-  // 天盘八门：值使门加临时支宫
+  // 时支宫（值使门落宫）
   const hourZhi = ZHI[hourZhiIndex];
   let hourZhiPalace = 1;
   for (const p of SEQ8) {
@@ -204,22 +229,71 @@ export function computeQimen(input) {
     }
   }
   const zhiShiDoorHome = DOOR_HOME[vfPalace8];
-  const doorOffset = stepsBetween(SEQ8, vfPalace8, hourZhiPalace, forward);
-  const tianDoor = {};
-  SEQ8.forEach((p) => {
-    const n = SEQ8.length;
-    const i = SEQ8.indexOf(p);
-    const back = SEQ8[(((i - (forward ? doorOffset : -doorOffset)) % n) + n) % n];
-    tianDoor[p] = DOOR_HOME[back];
-  });
 
-  // 八神：值符加临时干宫
-  const shenList = isYang ? SHEN_YANG : SHEN_YIN;
+  const tianPan = {};
+  const tianStar = {};
+  const tianDoor = {};
   const tianShen = {};
-  const shenSeq = rotate(SEQ8, sgPalace8, forward, 8);
-  shenSeq.forEach((p, i) => {
-    tianShen[p] = shenList[i];
-  });
+
+  if (isFeiPan) {
+    // —— Phase 2：飞盘奇门（九宫洛书顺逆飞布） ——
+    // 1. 天盘三奇六仪：从值符六仪 yi 起于时干落宫 sgPalace，按阳顺阴逆沿洛书九宫飞布
+    const yiIdx = DI_SEQ.indexOf(yi);
+    const feiSeq9 = rotate(SEQ9, sgPalace, forward, 9);
+    feiSeq9.forEach((p, k) => {
+      tianPan[p] = DI_SEQ[(yiIdx + k) % 9];
+    });
+    // 2. 天盘九星：九星（含天禽）从值符星 STAR_HOME[vfPalace] 起于时干落宫 sgPalace，按阳顺阴逆沿九宫飞布
+    const vfStarName = STAR_HOME[vfPalace];
+    const vfStarIdx = FEI_STAR_ORDER.indexOf(vfStarName);
+    feiSeq9.forEach((p, k) => {
+      tianStar[p] = FEI_STAR_ORDER[(vfStarIdx + (forward ? k : -k) + 9) % 9];
+    });
+    // 3. 天盘八门：从值使门 zhiShiDoorHome 起于时支宫 hourZhiPalace，按阳顺阴逆沿八宫 SEQ8 飞布
+    const zsDoorIdx = FEI_DOOR_ORDER.indexOf(zhiShiDoorHome);
+    const feiDoorSeq8 = rotate(SEQ8, hourZhiPalace, forward, 8);
+    feiDoorSeq8.forEach((p, k) => {
+      tianDoor[p] = FEI_DOOR_ORDER[(zsDoorIdx + (forward ? k : -k) + 8) % 8];
+    });
+    // 4. 八神：从值符起于 sgPalace8，按阳顺阴逆沿 SEQ8 飞布
+    const shenList = isYang ? SHEN_YANG : SHEN_YIN;
+    const shenSeq = rotate(SEQ8, sgPalace8, forward, 8);
+    shenSeq.forEach((p, i) => {
+      tianShen[p] = shenList[i];
+    });
+  } else {
+    // —— 转盘奇门（保持原有精确逻辑） ——
+    const offset = stepsBetween(SEQ9, vfPalace, sgPalace, forward);
+    for (const p of SEQ9) {
+      const n = SEQ9.length;
+      const i = SEQ9.indexOf(p);
+      const back = SEQ9[(((i - (forward ? offset : -offset)) % n) + n) % n];
+      tianPan[p] = diPan[back];
+    }
+
+    const zhiFuStarHome = STAR_HOME[vfPalace] === '天禽' ? '天芮' : STAR_HOME[vfPalace];
+    const starOffset = stepsBetween(SEQ8, STAR_HOME8[STAR_ORDER.indexOf(zhiFuStarHome)], sgPalace8, forward);
+    SEQ8.forEach((p) => {
+      const n = SEQ8.length;
+      const i = SEQ8.indexOf(p);
+      const back = SEQ8[(((i - (forward ? starOffset : -starOffset)) % n) + n) % n];
+      tianStar[p] = STAR_HOME[back];
+    });
+
+    const doorOffset = stepsBetween(SEQ8, vfPalace8, hourZhiPalace, forward);
+    SEQ8.forEach((p) => {
+      const n = SEQ8.length;
+      const i = SEQ8.indexOf(p);
+      const back = SEQ8[(((i - (forward ? doorOffset : -doorOffset)) % n) + n) % n];
+      tianDoor[p] = DOOR_HOME[back];
+    });
+
+    const shenList = isYang ? SHEN_YANG : SHEN_YIN;
+    const shenSeq = rotate(SEQ8, sgPalace8, forward, 8);
+    shenSeq.forEach((p, i) => {
+      tianShen[p] = shenList[i];
+    });
+  }
 
   // 空亡与马星
   const kongWangZhi = xunkongOf(hourGzIndex).map((i) => ZHI[i]);
@@ -234,7 +308,6 @@ export function computeQimen(input) {
   }
 
   // 组装九宫
-  // 年月日时干标记：各柱天干（甲遁于本旬六仪）在天盘/地盘所落之宫
   const rawPillars = computePillars(dt.jdUtc, dt.jdSolar);
   const markGans = ['year', 'month', 'day', 'hour'].map((k) => {
     const label = { year: '年', month: '月', day: '日', hour: '时' }[k];
@@ -258,7 +331,7 @@ export function computeQimen(input) {
     const zhiList = PALACE_ZHI[p];
     const kw = isMid ? false : zhiList.some((z) => kongWangZhi.includes(z));
     const dkw = isMid ? false : zhiList.some((z) => dayKongWang.includes(z));
-    const tian = isMid ? null : tianPan[p];
+    const tian = isMid ? (isFeiPan ? tianPan[5] : null) : tianPan[p];
     const door = isMid ? null : tianDoor[p];
     const tianIdx = tian ? GAN.indexOf(tian) : -1;
     const cs = tian && !isMid ? changshengOf(tianIdx, ZHI.indexOf(zhiList[0])) : '';
@@ -270,8 +343,8 @@ export function computeQimen(input) {
       isMiddle: isMid,
       diPan: diPan[p],
       tianPan: tian,
-      star: isMid ? '天禽' : tianStar[p],
-      starExtra: p === 2 ? '（天禽寄坤）' : '',
+      star: isMid ? (isFeiPan ? tianStar[5] : '天禽') : tianStar[p],
+      starExtra: !isFeiPan && p === 2 ? '（天禽寄坤）' : '',
       door,
       shen: isMid ? null : tianShen[p],
       kongWang: kw,
@@ -289,8 +362,22 @@ export function computeQimen(input) {
       // —— 年月日时干标记 ——
       tianMarks: tianMarks[p],
       diMarks: diMarks[p],
+      patterns: [],
     };
   });
+
+  // Phase 2 新增：自动识别 20+ 奇门经典吉凶格局，并挂载到各宫与全局
+  const patternResult = detectQimenPatterns({
+    palaces,
+    riGan: riGz.gan,
+    shiGan: hourGz.gan,
+    shiGanzhi: hourGz.name,
+    zhiShiPalace: hourZhiPalace,
+    zhiFuPalace: sgPalace8,
+  });
+  for (const p of palaces) {
+    p.patterns = patternResult.byPalace[p.id] || [];
+  }
 
   // 用神与吉凶打分
   const purpose = PURPOSE[input.purpose] || PURPOSE.general;
@@ -327,6 +414,15 @@ export function computeQimen(input) {
       s += 1;
       why.push('马星所在，主动');
     }
+    for (const pat of p.patterns || []) {
+      if (pat.type === '吉') {
+        s += 1;
+        why.push(`成「${pat.name}」吉格`);
+      } else if (pat.type === '凶') {
+        s -= 1;
+        why.push(`逢「${pat.name}」凶格`);
+      }
+    }
     return { score: s, why };
   };
 
@@ -340,12 +436,13 @@ export function computeQimen(input) {
 
   return {
     panType: isYang ? '阳遁' : '阴遁',
-    panMethod: input.panType === 'fei' ? 'fei' : 'zhuan',
+    panMethod: isFeiPan ? 'fei' : 'zhuan',
     ju,
     juName: `${isYang ? '阳' : '阴'}遁${ju}局`,
     yuan: yuanName,
     juMethodName: juMethod === 'custom' ? '自选局数' : juMethod === 'zhirun' ? '置闰法' : juMethod === 'maoshan' ? '茅山法' : '拆补法',
     yuanBasis: `${yuanBasis}，${yuanName}`,
+    zhirunInfo,
     jiGongName,
     solarTerm: curTerm.name,
     solarTermJdUtc: curTerm.jdUtc,
@@ -355,6 +452,7 @@ export function computeQimen(input) {
     zhiFu: { star: STAR_HOME[vfPalace], palace: sgPalace8, palaceName: PALACE_NAME[sgPalace8], midNote: sgPalace === 5 ? '时干落中宫，寄坤宫论' : null },
     zhiShi: { door: zhiShiDoorHome, palace: hourZhiPalace, palaceName: PALACE_NAME[hourZhiPalace] },
     palaces,
+    patterns: patternResult.all,
     kongWang: kongWangZhi,
     dayKongWang,
     maXing: { zhi: maZhi, palace: maPalace, palaceName: maPalace ? PALACE_NAME[maPalace] : null },
@@ -362,7 +460,6 @@ export function computeQimen(input) {
       ri: { ganzhi: riGz.name, gan: riGz.gan, zhi: riGz.zhi },
       shi: { ganzhi: hourGz.name, gan: hourGz.gan, zhi: hourGz.zhi },
     },
-    // 完整四柱 + 各柱空亡（与八字同一套算法）
     fourPillars: (() => {
       const raw = computePillars(dt.jdUtc, dt.jdSolar);
       const out = {};
@@ -401,5 +498,5 @@ export function computeQimen(input) {
   };
 }
 
-export const QIMEN_ENGINE_VERSION = '1.1.0';
-export { PALACE_NAME, PALACE_DIR, PALACE_ZHI };
+export const QIMEN_ENGINE_VERSION = '1.5.0';
+export { PALACE_NAME, PALACE_DIR };

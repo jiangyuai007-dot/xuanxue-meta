@@ -8,16 +8,14 @@
  *  - 紫微落宫：采用「起紫微星表」查表法（5 局 × 30 日），不依赖易错的公式
  *  - 天府落宫：紫府对照表
  *  - 十四主星：紫微系逆时针、天府系顺时针，固定空档布列
- *  - 四化：生年十天干四化口诀表
- *
- * 保守声明：火星/铃星按中州派近似规则安放，引擎版本中标注为待校验项；
- * 其余（命宫、五行局、紫微/天府、十四主星、四化、辅星、大限）为本派通用标准。
+ *  - 火星/铃星：按《紫微斗数全书》标准口诀（寅午戌人丑卯方、申子辰人寅戌扬、巳酉丑人卯戌位、亥卯未人酉戌房，起子时顺数至生时）
+ *  - 四化：生年十天干四化 + 十二宫宫干四化飞星矩阵（化禄/化权/化科/化忌飞入宫位、自化、冲宫）
  */
 
 import { resolveDateTime } from '../core/time.js';
 import { toLunar } from '../core/lunar.js';
 import { jdToYmdhms } from '../core/julian.js';
-import { computePillars } from './bazi.js';
+import { computePillars, normalizeInput } from './bazi.js';
 import {
   GAN, ZHI, GAN_WUXING, ZHI_WUXING, GAN_YANG, WUXING,
   ganzhiOfIndex, nayinOfIndex, indexOfGanzhi,
@@ -90,9 +88,7 @@ const TIANFU_STARS = [
   { name: '破军', sys: 'fu', step: 10, wuxing: '水' },
 ];
 
-/** 十四主星亮度表（七级：庙>旺>得>利>平>不>陷）。
- *  数据源：iztro / ziwei.pro 通行表，按 子丑寅卯辰巳午未申酉戌亥 排列；
- *  不同流派个别宫略有出入，图例中已注明。 */
+/** 十四主星亮度表（七级：庙>旺>得>利>平>不>陷） */
 export const BRIGHTNESS = {
   紫微: '平庙旺旺得旺庙庙旺旺得旺',
   天机: '庙陷得旺利平庙陷得旺利平',
@@ -110,7 +106,7 @@ export const BRIGHTNESS = {
   破军: '庙旺得陷旺平庙旺得陷旺平',
 };
 
-/** 生年十天干四化表：化禄/化权/化科/化忌（导出供流年四化复用） */
+/** 生年十天干四化表：化禄/化权/化科/化忌（导出供流年及宫干飞星复用） */
 export const SIHUA = {
   0: { lu: '廉贞', quan: '破军', ke: '武曲', ji: '太阳' }, // 甲
   1: { lu: '天机', quan: '天梁', ke: '紫微', ji: '太阴' }, // 乙
@@ -153,20 +149,28 @@ function sanhe(zhiIndex) {
  * 主入口
  */
 export function computeZiwei(input) {
-  const src = { ...input };
+  // Phase 1 修复：统一走 normalizeInput 收敛字符串生辰并支持农历/闰月输入转换
+  const src = normalizeInput(input);
   const dt = resolveDateTime(src);
   const { jdUtc, jdSolar } = dt;
   const solarHour = ((jdSolar + 0.5) % 1) * 24;
   const h = hourZhiIndex(solarHour);
   const lateZi = solarHour >= 23;
 
-  // 农历（按真太阳时取日，晚子时自然顺延）
-  const lunar = toLunar(jdSolar, 0);
-  const lMonth = lunar.month;
+  // Phase 1 修复：晚子时（23:00–23:59）农历日顺延至次日，与四柱日干支进位严格对齐
+  const lunar = toLunar(lateZi ? jdSolar + 1 / 24 : jdSolar, 0);
+  // 闰月分界规则：默认 'split15'（15日及以前作本月，15日后作下月），支持 'next'（作下月）、'current'（作本月）
+  const leapRule = src.leapMonthRule || 'split15';
+  const lMonth = lunar.isLeap
+    ? (leapRule === 'next'
+      ? (lunar.month % 12) + 1
+      : leapRule === 'current'
+        ? lunar.month
+        : (lunar.day > 15 ? (lunar.month % 12) + 1 : lunar.month))
+    : lunar.month;
   const lDay = lunar.day;
   const yearGan = lunar.yearGanzhi[0];
   const yearGanIndex = GAN.indexOf(yearGan);
-  // 年支索引：yearGanzhi 第二字为地支（zodiac 是生肖名「马」等，不能直接查支序）
   const yearZhiIndex = zidx(lunar.yearGanzhi[1]);
 
   // 命宫 / 身宫
@@ -220,87 +224,116 @@ export function computeZiwei(input) {
   fuStars['禄存'] = luZhi;
   fuStars['擎羊'] = (luZhi + 1) % 12;
   fuStars['陀罗'] = (luZhi - 1 + 12) % 12;
-  // 火星 / 铃星（中州派近似，待校验）
+
+  // Phase 2 精进：火星 / 铃星按《紫微斗数全书》标准安火铃诀（寅午戌人丑卯方、申子辰人寅戌扬、巳酉丑人卯戌位、亥卯未人酉戌房，子时起顺数至生时）
   const sh = sanhe(yearZhiIndex);
-  const huoBase = { 火: zidx('丑'), 水: zidx('卯'), 金: zidx('酉'), 木: zidx('卯') }[sh];
-  const lingBase = { 火: zidx('寅'), 水: zidx('戌'), 金: zidx('戌'), 木: zidx('寅') }[sh];
+  const huoBase = { 火: zidx('丑'), 水: zidx('寅'), 金: zidx('卯'), 木: zidx('酉') }[sh];
+  const lingBase = { 火: zidx('卯'), 水: zidx('戌'), 金: zidx('戌'), 木: zidx('戌') }[sh];
   fuStars['火星'] = (huoBase + h) % 12;
   fuStars['铃星'] = (lingBase + h) % 12;
+
   // 红鸾 / 天喜
   fuStars['红鸾'] = (yearZhiIndex + 1) % 12;
   fuStars['天喜'] = (fuStars['红鸾'] + 6) % 12;
 
-  // —— 杂曜（安法均按通行规则，个别流派略有出入，见图例说明） ——
+  // —— 杂曜 ——
   const za = {};
-  // 月系：丑起天姚、酉起天刑、巳起天巫、戌起天月、寅起阴煞，皆顺数至生月
   za['天姚'] = (zidx('丑') + lMonth - 1) % 12;
   za['天刑'] = (zidx('酉') + lMonth - 1) % 12;
   za['天巫'] = (zidx('巳') + lMonth - 1) % 12;
   za['天月'] = (zidx('戌') + lMonth - 1) % 12;
   za['阴煞'] = (zidx('寅') + lMonth - 1) % 12;
-  // 时系：亥起地劫顺数、地空逆数；寅起封诰顺数生时
   za['地劫'] = (zidx('亥') + h) % 12;
   za['地空'] = (zidx('亥') - h + 24) % 12;
   za['封诰'] = (zidx('寅') + h) % 12;
-  // 年支系
-  za['天马'] = zidx({ 水: '寅', 火: '申', 金: '亥', 木: '巳' }[sanhe(yearZhiIndex)]); // 申子辰在寅、寅午戌在申、巳酉丑在亥、亥卯未在巳
-  za['天哭'] = (zidx('午') - yearZhiIndex + 24) % 12; // 午起子年逆数至生年
-  za['天虚'] = (zidx('午') + yearZhiIndex) % 12;      // 午起子年顺数至生年
-  za['龙池'] = (zidx('辰') + yearZhiIndex) % 12;      // 辰起子年顺数
-  za['凤阁'] = (zidx('戌') - yearZhiIndex + 24) % 12; // 戌起子年逆数
+  za['天马'] = zidx({ 水: '寅', 火: '申', 金: '亥', 木: '巳' }[sanhe(yearZhiIndex)]);
+  za['天哭'] = (zidx('午') - yearZhiIndex + 24) % 12;
+  za['天虚'] = (zidx('午') + yearZhiIndex) % 12;
+  za['龙池'] = (zidx('辰') + yearZhiIndex) % 12;
+  za['凤阁'] = (zidx('戌') - yearZhiIndex + 24) % 12;
   const GU_TABLE = { 子: '寅', 丑: '寅', 寅: '巳', 卯: '巳', 辰: '巳', 巳: '申', 午: '申', 未: '申', 申: '亥', 酉: '亥', 戌: '亥', 亥: '寅' };
   const GUA_TABLE2 = { 子: '戌', 丑: '戌', 寅: '丑', 卯: '丑', 辰: '丑', 巳: '辰', 午: '辰', 未: '辰', 申: '未', 酉: '未', 戌: '未', 亥: '戌' };
   za['孤辰'] = zidx(GU_TABLE[ZHI[yearZhiIndex]]);
   za['寡宿'] = zidx(GUA_TABLE2[ZHI[yearZhiIndex]]);
-  za['破碎'] = zidx(['巳', '丑', '酉'][yearZhiIndex % 3]); // 子午卯酉在巳、丑辰未戌在丑、寅巳申亥在酉
-  za['天才'] = (mingIndex + yearZhiIndex) % 12; // 命宫起子年顺数至生年
-  za['天寿'] = (shenIndex + yearZhiIndex) % 12; // 身宫起子年顺数至生年
-  // 生日系：三台（左辅起初一顺数）、八座（右弼起初一逆数）、恩光（文昌起初一顺数）、天贵（文曲起初一顺数）
+  za['破碎'] = zidx(['巳', '丑', '酉'][yearZhiIndex % 3]);
+  za['天才'] = (mingIndex + yearZhiIndex) % 12;
+  za['天寿'] = (shenIndex + yearZhiIndex) % 12;
   const bday = Math.min(30, Math.max(1, lDay));
   za['三台'] = (fuStars['左辅'] + bday - 1) % 12;
   za['八座'] = (fuStars['右弼'] - bday + 1 + 360) % 12;
   za['恩光'] = (fuStars['文昌'] + bday - 1) % 12;
   za['天贵'] = (fuStars['文曲'] + bday - 1) % 12;
-  // 年干系：截路空亡（甲己申酉、乙庚午未、丙辛辰巳、丁壬寅卯、戊癸子丑，每干双支）
   const JK = { 0: ['申', '酉'], 1: ['午', '未'], 2: ['辰', '巳'], 3: ['寅', '卯'], 4: ['子', '丑'], 5: ['子', '丑'], 6: ['申', '酉'], 7: ['午', '未'], 8: ['辰', '巳'], 9: ['寅', '卯'] };
   za['截空'] = zidx(JK[yearGanIndex][0]);
   za['截空2'] = zidx(JK[yearGanIndex][1]);
-  // 天伤（居仆役/交友宫）、天使（居疾厄宫）
   za['天伤'] = (mingIndex + 8) % 12;
   za['天使'] = (mingIndex + 6) % 12;
-  // 台辅（年支系：午宫起子年顺数至生年支）
   za['台辅'] = (zidx('午') + yearZhiIndex) % 12;
 
-  // —— 博士十二神（禄存起，阳男阴女顺行、阴男阳女逆行） ——
+  // —— 博士十二神 ——
   const BOSHI = ['博士', '力士', '青龙', '小耗', '将军', '奏书', '飞廉', '喜神', '病符', '大耗', '伏兵', '官府'];
   const maleFlag = src.gender !== 'female';
   const forwardShi = (GAN_YANG[yearGanIndex] && maleFlag) || (!GAN_YANG[yearGanIndex] && !maleFlag);
   const shiDir = forwardShi ? 1 : -1;
   const boshiList = BOSHI.map((nm, i) => ({ name: nm, zi: (luZhi + shiDir * i + 360) % 12 }));
 
-  // —— 长生十二神（按五行局起长生，阳男阴女顺行、阴男阳女逆行） ——
+  // —— 长生十二神 ——
   const CHANG12 = ['长生', '沐浴', '冠带', '临官', '帝旺', '衰', '病', '死', '墓', '绝', '胎', '养'];
   const csStart = { 水二局: '申', 木三局: '亥', 金四局: '巳', 土五局: '申', 火六局: '寅' }[juName];
   const changList = CHANG12.map((nm, i) => ({ name: nm, zi: (zidx(csStart) + shiDir * i + 360) % 12 }));
 
-  // —— 将前十二星（年支三合起将星，顺行十二宫） ——
+  // —— 将前十二星 ——
   const JIANG12 = ['将星', '攀鞍', '岁驿', '息神', '华盖', '劫煞', '灾煞', '天煞', '指背', '咸池', '月煞', '亡神'];
   const jiangStart = { 水: '子', 火: '午', 金: '酉', 木: '卯' }[sanhe(yearZhiIndex)];
   const jiangList = JIANG12.map((nm, i) => ({ name: nm, zi: (zidx(jiangStart) + i) % 12 }));
 
-  // —— 岁前十二星（生年支起岁建，顺行十二宫） ——
+  // —— 岁前十二星 ——
   const SUI12 = ['岁建', '晦气', '丧门', '贯索', '官符', '小耗', '大耗', '龙德', '白虎', '天德', '吊客', '病符'];
   const suiList = SUI12.map((nm, i) => ({ name: nm, zi: (yearZhiIndex + i) % 12 }));
 
-  // 四化
+  // 生年四化
   const hua = SIHUA[yearGanIndex];
   const huaMark = {}; // 星名 -> 化禄/权/科/忌
   for (const t of ['lu', 'quan', 'ke', 'ji']) {
     huaMark[hua[t]] = { type: t, label: { lu: '禄', quan: '权', ke: '科', ji: '忌' }[t] };
   }
 
+  // 星名 -> 落宫地支索引（主星 + 辅星，供生年四化与十二宫宫干飞星查表）
+  const starZhiMap = { ...starAt, ...fuStars };
+  const zhiToPalaceName = {};
+  for (let i = 0; i < 12; i++) {
+    const z = (mingIndex + i) % 12;
+    zhiToPalaceName[z] = PALACE_ORDER[i];
+  }
+
+  // Phase 2 新增：十二宫宫干四化飞星矩阵（飞入何宫、是否自化、化忌冲何宫）
+  const computeFlyHua = (ganIdx, fromZhiIdx) => {
+    const shMap = SIHUA[ganIdx] || {};
+    const out = { gan: GAN[ganIdx] };
+    for (const [key, label] of [['lu', '禄'], ['quan', '权'], ['ke', '科'], ['ji', '忌']]) {
+      const star = shMap[key] || '';
+      const targetZhiIndex = starZhiMap[star] !== undefined ? starZhiMap[star] : fromZhiIdx;
+      const chongZhiIndex = (targetZhiIndex + 6) % 12;
+      out[key] = {
+        type: key,
+        label,
+        star,
+        targetZhiIndex,
+        targetZhi: ZHI[targetZhiIndex],
+        targetPalace: zhiToPalaceName[targetZhiIndex] || '',
+        isSelf: targetZhiIndex === fromZhiIdx,
+        isOpposite: targetZhiIndex === (fromZhiIdx + 6) % 12,
+        chongZhiIndex,
+        chongZhi: ZHI[chongZhiIndex],
+        chongPalace: zhiToPalaceName[chongZhiIndex] || '',
+      };
+    }
+    return out;
+  };
+
   // 组装十二宫
   const palaces = {};
+  const palaceSihua = {};
   for (let i = 0; i < 12; i++) {
     const z = (mingIndex + i) % 12;
     const gzIndex = indexOfGanzhi(palaceGan[z], z);
@@ -320,6 +353,8 @@ export function computeZiwei(input) {
         if (s.zi === z) stars.push({ name: s.name, kind: '杂', wuxing: fuWuxing(s.name) });
       }
     }
+    const flyHua = computeFlyHua(palaceGan[z], z);
+    palaceSihua[PALACE_ORDER[i]] = flyHua;
     palaces[PALACE_ORDER[i]] = {
       name: PALACE_ORDER[i],
       zhiIndex: z,
@@ -328,6 +363,7 @@ export function computeZiwei(input) {
       gan: gz.gan,
       zhiName: ZHI[z],
       stars,
+      flyHua,
       isMing: i === 0,
       isShen: z === shenIndex,
     };
@@ -337,7 +373,6 @@ export function computeZiwei(input) {
   const yangYear = GAN_YANG[yearGanIndex];
   const male = src.gender !== 'female';
   const forward = (yangYear && male) || (!yangYear && male === false);
-  // 出生公历年 + 当前虚岁（用于标注当前大限）
   const birthYear = jdToYmdhms(jdUtc).year;
   const nowYear = new Date().getFullYear();
   const xuAge = nowYear - birthYear + 1; // 虚岁
@@ -351,8 +386,10 @@ export function computeZiwei(input) {
       order: i,
       palace: PALACE_ORDER[z === mingIndex ? 0 : (z - mingIndex + 12) % 12],
       zhi: ZHI[z],
+      zhiIndex: z,
       ganzhi: dxGz.name,
       sihua: { lu: dxHua.lu, quan: dxHua.quan, ke: dxHua.ke, ji: dxHua.ji },
+      flyHua: computeFlyHua(palaceGan[z], z),
       ageStart: startAge,
       ageEnd: startAge + 9,
       isCurrent: xuAge >= startAge && xuAge <= startAge + 9,
@@ -369,11 +406,21 @@ export function computeZiwei(input) {
   const curGzIndex = ((cy - 4) % 60 + 60) % 60;
   const liuNianZhiIndex = zidx(ganzhiOfIndex(curGzIndex).zhi);
 
+  const fourHuaDetail = (t) => {
+    const st = hua[t];
+    const zi = starZhiMap[st];
+    return {
+      star: st,
+      zhi: zi !== undefined ? ZHI[zi] : '',
+      palace: zi !== undefined ? zhiToPalaceName[zi] : '',
+    };
+  };
+
   return {
     birthYear,
     xuAge,
     mingZhu: MING_ZHU[ZHI[mingIndex]],
-    shenZhu: SHEN_ZHU[lunar.zodiac],
+    shenZhu: SHEN_ZHU[ZHI[yearZhiIndex]],
     solarDate: (() => { const d = jdToYmdhms(Math.floor(jdSolar + 0.5)); return { year: d.year, month: d.month, day: d.day }; })(),
     siZhu: (() => {
       const p = computePillars(jdUtc, jdSolar);
@@ -381,13 +428,25 @@ export function computeZiwei(input) {
     })(),
     mingGong: { zhi: ZHI[mingIndex], zhiIndex: mingIndex, ganzhi: ganzhiOfIndex(mingGzIndex).name },
     shenGong: { zhi: ZHI[shenIndex], zhiIndex: shenIndex },
-    lunar: { yearGanzhi: lunar.yearGanzhi, zodiac: lunar.zodiac, month: lMonth, day: lDay, isLeap: lunar.isLeap },
+    lunar: {
+      yearGanzhi: lunar.yearGanzhi,
+      zodiac: lunar.zodiac,
+      month: lunar.month,
+      effectiveMonth: lMonth,
+      leapMonthRule: leapRule,
+      day: lDay,
+      isLeap: lunar.isLeap,
+    },
     wuXingJu: ju,
     ziweiZhi,
     tianfuZhi,
     fourHua: {
-      lu: { star: hua.lu }, quan: { star: hua.quan }, ke: { star: hua.ke }, ji: { star: hua.ji },
+      lu: fourHuaDetail('lu'),
+      quan: fourHuaDetail('quan'),
+      ke: fourHuaDetail('ke'),
+      ji: fourHuaDetail('ji'),
     },
+    palaceSihua,
     starPositions: starAt,
     fuStarPositions: Object.fromEntries(Object.entries(fuStars).map(([k, v]) => [k, ZHI[v]])),
     palaces,
@@ -398,7 +457,7 @@ export function computeZiwei(input) {
       cityName: dt.cityName, lon: dt.lon, lat: dt.lat,
     },
     meta: {
-      approximations: ['火星/铃星按中州派近似规则安放，版本标注为待校验'],
+      approximations: [],
     },
   };
 }
@@ -415,5 +474,5 @@ function fuWuxing(name) {
   return m[name] || '土';
 }
 
-// 1.4.0: 星曜库扩充至 100+（新增月系/时系/年系杂曜、截空、天伤天使、博士/长生/将前/岁前十二神）
-export const ZIWEI_ENGINE_VERSION = '1.4.1';
+// 1.5.0: Phase 2 精进 —— 火星/铃星按全书标准口诀精确安放 + 十二宫宫干四化飞星矩阵 (flyHua / palaceSihua)
+export const ZIWEI_ENGINE_VERSION = '1.5.0';

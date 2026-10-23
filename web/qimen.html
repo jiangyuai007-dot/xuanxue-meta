@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>奇门遁甲 · 玄机</title>
+<meta name="theme-color" content="#241d14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="fonts/subset.css">
 </head>
@@ -84,7 +89,7 @@
         <label for="panType">盘式 / 寄宫</label>
         <div class="fb-ctl"><select aria-label="盘式与寄宫" id="panType">
             <option value="zhuan">转盘</option>
-            <option value="fei">飞盘（暂按转盘）</option>
+            <option value="fei">飞盘（九宫飞布）</option>
           </select>
           <select aria-label="寄宫宫位" id="jiGong">
             <option value="kun2">寄坤二宫</option>
@@ -113,7 +118,7 @@
         <button id="btnSaveReport" disabled>保存到我的报告</button>
       </div>
     </div>
-    <div class="fb-hint" aria-live="polite" id="sysHint">时家奇门 · 转盘 · 拆补法 · 九宫格局、值符值使、四害标记可点击解释</div>
+    <div class="fb-hint" aria-live="polite" id="sysHint">时家奇门 · 转盘/飞盘 · 拆补/置闰/茅山法 · 九宫格局、值符值使、四害与吉凶格可点击解释</div>
     <div class="fb-hint" aria-live="polite" style="color:var(--gold-ink)">未成年人请在监护人陪同下使用，付费内容需监护人同意。</div>
   </div>
   <div id="msg" aria-live="polite" class="msg"></div>
@@ -138,11 +143,13 @@
       <h3>奇门遁甲</h3>
       <p>选择时间与事由后点击「起局排盘」，九宫格局、值符值使、吉凶方位将在此呈现。</p>
       <div class="intro-tips">
-        <span>九宫排布</span><span>值符值使</span><span>八门九星</span><span>吉凶方位</span>
+        <span>九宫排布</span><span>值符值使</span><span>八门九星</span><span>吉凶格局</span>
       </div>
     </div>
 
     <div id="chart" class="chart-stage" style="display:none"></div>
+    <!-- Phase 2 升级：奇门接入统一流式章节卡片容器 -->
+    <div id="reportBody" class="rp-host" style="display:none"></div>
     <div id="warnings" class="warn" style="display:none"></div>
   </section>
 
@@ -172,5 +179,6 @@
 <script src="bazi-drill.js?v=20260927d"></script>
 <script src="cloud-history.js?v=20261006a"></script>
 <script src="app.js?v=20260927d"></script>
+<script src="poster.js?v=20261022"></script>
 </body>
 </html>

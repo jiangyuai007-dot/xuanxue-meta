@@ -1,16 +1,19 @@
 /**
- * 商业化骨架：SKU、章节解锁、模拟订单
- * 说明（设计文档 D8）：不接真实支付，订单为本地模拟，保留完整状态机以便后续对接
+ * 商业化核心模块：SKU、章节解锁、模拟/真实渠道订单、回调核销、对账与自助退款
+ * Phase 1 加固：订单读写接入统一存储层 src/storage/db.js（支持 node:sqlite WAL 与原子 CAS 合并）
+ * Phase 4 升级：
+ *   1. 新增 `ai_followup_pack`（大师追问包）SKU
+ *   2. `confirmPaid` 增加回调金额一致性校验（防一分钱改价攻击）与幂等核销计数
+ *   3. `listOrders` 附带 `canRefund` 与 `refundBlockReason`，支持前端一键自助退款
+ *   4. 新增 `reconcileOrders()` 订单对账与异常巡检接口（自动修复缺失权益令牌、汇总渠道 GMV 与退款流水）
  */
 
-import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { issueEntitlement } from './entitle.js';
 import { createCharge, refundCharge } from './pay/index.js';
+import { DATA_DIR, readCollection, writeCollection } from '../storage/db.js';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '../..');
-const DATA_DIR = path.join(ROOT, 'data');
 const ORDER_FILE = path.join(DATA_DIR, 'orders.json');
 
 /** 章节解锁定价表 */
@@ -79,19 +82,26 @@ export const SKUS = [
     name: '完整报告',
     type: 'bundle',
     price: 19.9,
-    desc: '解锁本报告全部章节',
+    desc: '解锁本报告全部章节与命盘追问',
     unlockAll: true,
   },
-  // full_plus（完整报告 + 追问 3 次）已下架：追问功能前后端均未实现，售卖未交付的能力会构成交易纠纷。
-  // 待追问功能上线后再重新上架。
   {
     id: 'member_month',
     name: '会员月卡',
     type: 'subscription',
     price: 19.9,
-    desc: '30 天内无限查看全部报告与每日提示',
+    desc: '30 天内无限查看全部报告、AI 追问与每日运势',
     unlockAll: true,
     days: 30,
+  },
+  {
+    id: 'ai_followup_pack',
+    name: '大师追问畅聊包',
+    type: 'pack',
+    price: 9.9,
+    desc: '解锁当前命盘深度多轮追问（针对跳槽/流年/感情/择方专项解答）',
+    unlockAll: false,
+    quota: 20,
   },
 ];
 
@@ -104,45 +114,29 @@ export function getSku(id) {
 }
 
 function loadOrders() {
-  try {
-    if (fs.existsSync(ORDER_FILE)) return JSON.parse(fs.readFileSync(ORDER_FILE, 'utf8'));
-  } catch {
-    /* ignore */
-  }
-  return [];
+  return readCollection('orders');
 }
 
-function saveOrders(list) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(ORDER_FILE, JSON.stringify(list, null, 2), 'utf8');
-  } catch {
-    /* 订单落盘失败不阻塞 */
-  }
+function saveOrders(list, opts = {}) {
+  writeCollection('orders', list, opts);
 }
 
-/**
- * 创建订单
- * @param {{ skuId:string, sectionKey?:string, system?:string, factPackId?:string }} req
- */
 const IDEMPOTENT_WINDOW_MS = 5 * 60 * 1000; // 5 分钟内重复相同下单视为同一订单，不重复计费
 
 /**
  * 创建订单（幂等）
  * 相同 (skuId, system, sectionKey, factPackId) 在 5 分钟内重复创建返回同一 pending 订单。
- * @param {{ skuId:string, sectionKey?:string, system?:string, factPackId?:string }} req
+ * @param {{ skuId:string, sectionKey?:string, system?:string, factPackId?:string, userId?:string }} req
  */
 export function createOrder(req) {
   const sku = getSku(req.skuId);
   if (!sku) throw new Error(`未知 SKU: ${req.skuId}`);
   const sectionKey = req.sectionKey || sku.sectionKey || null;
   if (sku.type === 'single' && !sectionKey) throw new Error('单章解锁需要指定 sectionKey');
-  // 章节键必须真实存在于该体系定价表：否则用户会为一个并不存在的章节付费（买了拿不到内容）
   if (sectionKey && req.system && SECTION_PRICE[req.system] && SECTION_PRICE[req.system][sectionKey] === undefined) {
     throw new Error('该体系没有这一章，请重新选择');
   }
 
-  // 幂等：相同维度且在窗口期内且仍为 pending 的订单直接返回，避免重复计费
   const now = Date.now();
   const list0 = loadOrders();
   const dup = list0.find(
@@ -168,7 +162,6 @@ export function createOrder(req) {
     sectionKey: sectionKey || null,
     system: req.system || null,
     factPackId: req.factPackId || null,
-    // 登录用户下单时绑定账号，供「订单中心 / 跨设备恢复权益」查询；游客下单为 null
     userId: req.userId || null,
     amount,
     currency: 'CNY',
@@ -185,56 +178,68 @@ export function createOrder(req) {
 
 /**
  * 模拟/真实支付统一入口。
- * - 默认 mock 渠道：立即判定已支付并签发权益凭证（保持既有冒烟测试语义）
- * - 真实渠道：订单保持 pending 并记录 tradeNo，必须等渠道异步回调 confirmPaid 才签发凭证
  */
 export function payOrder(orderId, { channel = 'mock' } = {}) {
   const list = loadOrders();
   const o = list.find((x) => x.id === orderId);
   if (!o) throw new Error(`订单不存在: ${orderId}`);
   if (o.status === 'paid') {
-    // 幂等：已支付则直接复用已签发凭证
     if (!o.entitlement) o.entitlement = issueEntitlement(o);
     saveOrders(list);
     return o;
   }
   if (o.status === 'refunded') throw new Error('该订单已退款，无法再次支付');
 
-  const charge = createCharge({ order: o, channel }); // 渠道未配置时会抛中文错误
+  const charge = createCharge({ order: o, channel });
   o.channel = channel;
   o.tradeNo = charge.tradeNo || null;
   if (charge.paid) {
     o.status = 'paid';
     o.paidAt = new Date().toISOString();
-    // 服务端签发权益凭证（核心：绝不在前端信任章节数组）
     o.entitlement = issueEntitlement(o);
   } else {
-    // 真实渠道：等异步回调，绝不允许就地判定为已支付
-    o.payInfo = { payUrl: charge.payUrl || null, codeUrl: charge.codeUrl || null, orderString: charge.orderString || null };
+    o.payInfo = {
+      payUrl: charge.payUrl || null,
+      codeUrl: charge.codeUrl || null,
+      orderString: charge.orderString || null,
+      notifyUrl: charge.notifyUrl || null,
+    };
   }
   saveOrders(list);
   return o;
 }
 
 /**
- * 异步支付回调确认（幂等）：重复回调返回同一凭证，不会重复签发。
- * 仅真实渠道需要；mock 渠道不走这条路。
+ * 异步支付回调确认（幂等 + 金额防篡改核验）
  */
-export function confirmPaid(orderId, { tradeNo } = {}) {
+export function confirmPaid(orderId, { tradeNo, amountFen, channel } = {}) {
   const list = loadOrders();
   const o = list.find((x) => x.id === orderId);
   if (!o) throw new Error(`订单不存在: ${orderId}`);
+
+  // 若回调报文带了实付分值（amountFen），必须与订单应付分值一致，防止低价替单攻击
+  if (Number.isFinite(amountFen)) {
+    const expectFen = Math.round(Number(o.amount || 0) * 100);
+    if (amountFen !== expectFen) {
+      throw new Error(`支付回调金额不匹配：应付 ${expectFen} 分，实付 ${amountFen} 分`);
+    }
+  }
+
+  o.notifyCount = (o.notifyCount || 0) + 1;
+  o.lastNotifyAt = new Date().toISOString();
+
   if (o.status === 'paid') {
     if (!o.entitlement) {
       o.entitlement = issueEntitlement(o);
-      saveOrders(list);
     }
+    saveOrders(list);
     return o;
   }
   if (o.status === 'refunded') throw new Error('订单已退款，无法确认支付');
   o.status = 'paid';
   o.paidAt = new Date().toISOString();
   if (tradeNo) o.tradeNo = tradeNo;
+  if (channel && !o.channel) o.channel = channel;
   o.entitlement = issueEntitlement(o);
   saveOrders(list);
   return o;
@@ -256,7 +261,6 @@ export const REFUND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * 退款策略判定
- * @returns {{ ok:boolean, reason:string }} ok=false 时 reason 为可直接展示给用户的中文原因
  */
 export function canRefund(order) {
   if (!order) return { ok: false, reason: '订单不存在' };
@@ -271,15 +275,14 @@ export function canRefund(order) {
   if (order.consumedAt) {
     return {
       ok: false,
-      reason: '付费内容已完整查看，数字化内容不支持无理由退款；如属重复扣款或内容缺失，请联系 support@example.com 人工处理',
+      reason: '付费内容已完整查看，数字化内容不支持无理由退款；如属重复扣款或内容缺失，请联系客服处理',
     };
   }
   return { ok: true, reason: '' };
 }
 
 /**
- * 退款：先过策略，不通过时抛出中文原因（由接口层转 400）。
- * 通过后调用渠道退款、置 refunded、清空凭证（凭证立即失效）。
+ * 退款
  */
 export function refundOrder(orderId, { reason = '' } = {}) {
   const list = loadOrders();
@@ -292,12 +295,12 @@ export function refundOrder(orderId, { reason = '' } = {}) {
   o.refundedAt = new Date().toISOString();
   o.refundReason = reason || '用户自助申请';
   o.refundId = r && r.refundId ? r.refundId : null;
-  o.entitlement = null; // 凭证立即失效
+  o.entitlement = null;
   saveOrders(list);
   return o;
 }
 
-/** 订单查询（订单中心用）：按用户隔离，按时间倒序 */
+/** 订单查询（订单中心用）：按用户隔离，按时间倒序，并附带可退款判定 */
 export function listOrders({ userId, status, limit = 50 } = {}) {
   let list = loadOrders();
   if (userId) list = list.filter((o) => o.userId === userId);
@@ -305,7 +308,15 @@ export function listOrders({ userId, status, limit = 50 } = {}) {
   return list
     .slice()
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, limit);
+    .slice(0, limit)
+    .map((o) => {
+      const cr = canRefund(o);
+      return {
+        ...o,
+        canRefund: cr.ok,
+        refundBlockReason: cr.reason || '',
+      };
+    });
 }
 
 /** 关闭超时未支付订单（默认 30 分钟） */
@@ -325,44 +336,36 @@ export function closeExpiredOrders(ttlMs = 30 * 60 * 1000) {
 }
 
 export function getOrder(orderId) {
-  return loadOrders().find((x) => x.id === orderId) || null;
+  const o = loadOrders().find((x) => x.id === orderId) || null;
+  if (!o) return null;
+  const cr = canRefund(o);
+  return { ...o, canRefund: cr.ok, refundBlockReason: cr.reason || '' };
 }
 
 /**
  * 计算已解锁章节
- *
- * 解锁按「报告 / 档案」维度计算，前端在生成报告时把本机已购集合（purchased）带给后端，
- * 后端只在该体系合法章节键范围内认可，避免越权解锁。purchased 未传时回退到历史订单
- * （全局解锁），以兼容旧调用与冒烟测试；单机产品形态下前端永远显式携带 purchased。
- *
- * @param {{ system?:string, purchased?:string[] }} opts
- * @returns {string[]}
  */
 export function unlockedSections(opts = {}) {
   const { system, purchased } = opts;
   const out = new Set();
-  // 新路径：按前端带来的已购集合（按档案持久化）解锁，仅认该系统合法章节键
   if (Array.isArray(purchased)) {
     const valid = SECTION_PRICE[system] || {};
     for (const k of purchased) if (valid[k] !== undefined) out.add(k);
     return [...out];
   }
-  // 旧路径：基于已支付订单（兼容测试与无前端场景）
   const list = loadOrders().filter((o) => o.status === 'paid');
   const now = Date.now();
   for (const o of list) {
-    if (o.validUntil && new Date(o.validUntil).getTime() < now) continue; // 订阅过期
+    if (o.validUntil && new Date(o.validUntil).getTime() < now) continue;
     const sku = getSku(o.skuId);
     if (!sku) continue;
     if (sku.type === 'subscription') {
-      // 订阅卡跨体系全解锁
       for (const sys of Object.keys(SECTION_PRICE)) {
         for (const k of Object.keys(SECTION_PRICE[sys])) out.add(k);
       }
       continue;
     }
     if (sku.unlockAll) {
-      // 全量包仅解锁该订单所属体系
       if (o.system && SECTION_PRICE[o.system]) {
         for (const k of Object.keys(SECTION_PRICE[o.system])) out.add(k);
       }
@@ -373,13 +376,6 @@ export function unlockedSections(opts = {}) {
   return [...out];
 }
 
-/**
- * 计算一个 SKU 在当前体系下会解锁的章节键（供前端拼装已购集合与支付清单）
- * @param {{ id:string, unlockAll?:boolean, sectionKey?:string|null }} sku
- * @param {string} system
- * @param {string} [sectionKey] 单章解锁时由调用方指定
- * @returns {string[]}
- */
 export function skuSectionKeys(sku, system, sectionKey) {
   if (sku.id === 'single_section') return sectionKey ? [sectionKey] : [];
   if (sku.id === 'chenggu_detail') return ['chenggu'];
@@ -389,7 +385,7 @@ export function skuSectionKeys(sku, system, sectionKey) {
 
 /** 清空订单（测试用） */
 export function resetOrders() {
-  saveOrders([]);
+  saveOrders([], { replaceAll: true });
   return true;
 }
 
@@ -402,5 +398,75 @@ export function orderStats() {
     paid: paid.length,
     refunded: list.filter((o) => o.status === 'refunded').length,
     gmv: Math.round(paid.reduce((a, b) => a + b.amount, 0) * 100) / 100,
+    file: ORDER_FILE,
+  };
+}
+
+/**
+ * Phase 4：订单自动对账与异常修复（Reconciliation）
+ * 巡检全部订单：
+ *   1. 若发现 status==='paid' 但因极端中断缺失 entitlement 令牌，自动补签并落盘修复；
+ *   2. 按渠道（mock/wechat/alipay）统计实收 GMV、退款金额与待支付单量；
+ *   3. 列出异常单明细供运营核查。
+ */
+export function reconcileOrders({ autoHeal = true } = {}) {
+  const list = loadOrders();
+  let healedCount = 0;
+  const anomalies = [];
+  const byChannel = {};
+
+  for (const o of list) {
+    const ch = o.channel || 'unassigned';
+    if (!byChannel[ch]) {
+      byChannel[ch] = { count: 0, paidCount: 0, refundedCount: 0, gmv: 0, refundedAmount: 0 };
+    }
+    byChannel[ch].count += 1;
+    if (o.status === 'paid') {
+      byChannel[ch].paidCount += 1;
+      byChannel[ch].gmv = Math.round((byChannel[ch].gmv + Number(o.amount || 0)) * 100) / 100;
+      if (!o.entitlement) {
+        if (autoHeal) {
+          o.entitlement = issueEntitlement(o);
+          healedCount += 1;
+        } else {
+          anomalies.push({ orderId: o.id, issue: 'MISSING_ENTITLEMENT' });
+        }
+      }
+      if (!o.tradeNo) {
+        anomalies.push({ orderId: o.id, issue: 'MISSING_TRADE_NO' });
+      }
+    } else if (o.status === 'refunded') {
+      byChannel[ch].refundedCount += 1;
+      byChannel[ch].refundedAmount = Math.round((byChannel[ch].refundedAmount + Number(o.amount || 0)) * 100) / 100;
+      if (o.entitlement) {
+        if (autoHeal) {
+          o.entitlement = null;
+          healedCount += 1;
+        } else {
+          anomalies.push({ orderId: o.id, issue: 'REFUNDED_WITH_ACTIVE_ENTITLEMENT' });
+        }
+      }
+    }
+  }
+
+  if (healedCount > 0) {
+    saveOrders(list);
+  }
+
+  const paid = list.filter((o) => o.status === 'paid');
+  const refunded = list.filter((o) => o.status === 'refunded');
+  const pending = list.filter((o) => o.status === 'pending');
+
+  return {
+    checkedAt: new Date().toISOString(),
+    total: list.length,
+    paid: paid.length,
+    pending: pending.length,
+    refunded: refunded.length,
+    gmv: Math.round(paid.reduce((a, b) => a + Number(b.amount || 0), 0) * 100) / 100,
+    refundedAmount: Math.round(refunded.reduce((a, b) => a + Number(b.amount || 0), 0) * 100) / 100,
+    healedCount,
+    anomalies,
+    byChannel,
   };
 }
