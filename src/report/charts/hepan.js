@@ -115,7 +115,7 @@ function renderRadar(dims) {
   const cx = 150, cy = 92, R = 52;
   const ang = (i) => (Math.PI * 2 * i) / n - Math.PI / 2;
   const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
-  const val = (d) => Math.max(0.08, Math.min(1, (Number(d.score) || 0) / (Number(d.weight) || 100)));
+  const val = (d) => Math.max(0.18, Math.min(1, 0.5 + ((Number(d.score) || 0) / (Number(d.weight) || 20)) * 0.5));
   const rings = [0.33, 0.66, 1]
     .map((f) => `<polygon points="${dims.map((_, i) => pt(i, R * f).join(',')).join(' ')}" fill="none" stroke="#e2d8c5" stroke-width="1"/>`)
     .join('');
@@ -139,7 +139,7 @@ function renderRadar(dims) {
 function renderHero(f) {
   const dims = f.dims || [];
   const dimBars = dims.map((d) => {
-    const pct = Math.max(8, Math.min(100, Math.round(Number(d.score) || 0)));
+    const pct = Math.max(18, Math.min(100, Math.round(50 + ((Number(d.score) || 0) / (Number(d.weight) || 20)) * 50)));
     return `<div class="hp-dim-item">
       <div class="hp-dim-hd"><span>${esc(d.label)}</span><b>${pct}分</b></div>
       <div class="hp-dim-bar"><i style="width:${pct}%"></i></div>

@@ -10,6 +10,7 @@
  *  - 十四主星：紫微系逆时针、天府系顺时针，固定空档布列
  *  - 火星/铃星：按《紫微斗数全书》标准口诀（寅午戌人丑卯方、申子辰人寅戌扬、巳酉丑人卯戌位、亥卯未人酉戌房，起子时顺数至生时）
  *  - 四化：生年十天干四化 + 十二宫宫干四化飞星矩阵（化禄/化权/化科/化忌飞入宫位、自化、冲宫）
+ *  - 文墨天机标准分层：十四主星 + 吉曜/六煞（含亮度与本宫离心自化/对宫向心四化）+ 乙级杂曜 + 博士/岁前/将前/长生十二神
  */
 
 import { resolveDateTime } from '../core/time.js';
@@ -88,7 +89,7 @@ const TIANFU_STARS = [
   { name: '破军', sys: 'fu', step: 10, wuxing: '水' },
 ];
 
-/** 十四主星亮度表（七级：庙>旺>得>利>平>不>陷） */
+/** 十四主星亮度表（七级：庙>旺>得>利>平>不>陷，按子丑寅卯辰巳午未申酉戌亥序） */
 export const BRIGHTNESS = {
   紫微: '平庙旺旺得旺庙庙旺旺得旺',
   天机: '庙陷得旺利平庙陷得旺利平',
@@ -104,6 +105,18 @@ export const BRIGHTNESS = {
   天梁: '庙旺庙庙庙陷庙旺陷得庙陷',
   七杀: '旺庙庙旺庙平旺庙庙庙庙平',
   破军: '庙旺得陷旺平庙旺得陷旺平',
+};
+
+/** 辅曜/六煞亮度表（对标文墨天机：昌曲羊陀火铃地空地劫） */
+export const FU_BRIGHTNESS = {
+  文昌: '得庙陷利得庙陷利得庙陷利',
+  文曲: '得庙平旺得庙陷旺得庙陷旺',
+  火星: '平得庙利陷得庙利陷得庙利',
+  铃星: '陷得庙利陷得庙利陷得庙利',
+  擎羊: '旺庙陷陷庙陷平庙陷陷庙陷',
+  陀罗: '陷庙陷陷庙陷陷庙陷陷庙陷',
+  地空: '平陷陷平陷庙庙平庙庙陷陷',
+  地劫: '陷陷平平陷陷庙平庙平平陷',
 };
 
 /** 生年十天干四化表：化禄/化权/化科/化忌（导出供流年及宫干飞星复用） */
@@ -145,6 +158,8 @@ function sanhe(zhiIndex) {
   return '木'; // 亥卯未
 }
 
+const SHA_STARS = new Set(['擎羊', '陀罗', '火星', '铃星', '地空', '地劫']);
+
 /**
  * 主入口
  */
@@ -177,6 +192,8 @@ export function computeZiwei(input) {
   const base = (2 + (lMonth - 1)) % 12; // 寅起正月顺数到生月
   const mingIndex = (base - h + 12) % 12; // 逆数生时
   const shenIndex = (base + h) % 12; // 顺数生时
+  // 子年斗君：子宫起正月逆数至生月，再起子时顺数至生时
+  const ziDouIndex = (0 - (lMonth - 1) + h + 24) % 12;
 
   // 十二宫干（五虎遁起寅宫）
   const yinGan = WU_HU_DUN[yearGanIndex];
@@ -238,15 +255,16 @@ export function computeZiwei(input) {
 
   // —— 杂曜 ——
   const za = {};
-  za['天姚'] = (zidx('丑') + lMonth - 1) % 12;
+  za['地劫'] = (zidx('亥') + h) % 12;
+  za['地空'] = (zidx('亥') - h + 24) % 12;
+  za['天马'] = zidx({ 水: '寅', 火: '申', 金: '亥', 木: '巳' }[sanhe(yearZhiIndex)]);
   za['天刑'] = (zidx('酉') + lMonth - 1) % 12;
+  za['天姚'] = (zidx('丑') + lMonth - 1) % 12;
   za['天巫'] = (zidx('巳') + lMonth - 1) % 12;
   za['天月'] = (zidx('戌') + lMonth - 1) % 12;
   za['阴煞'] = (zidx('寅') + lMonth - 1) % 12;
-  za['地劫'] = (zidx('亥') + h) % 12;
-  za['地空'] = (zidx('亥') - h + 24) % 12;
+  za['台辅'] = (zidx('午') + yearZhiIndex) % 12;
   za['封诰'] = (zidx('寅') + h) % 12;
-  za['天马'] = zidx({ 水: '寅', 火: '申', 金: '亥', 木: '巳' }[sanhe(yearZhiIndex)]);
   za['天哭'] = (zidx('午') - yearZhiIndex + 24) % 12;
   za['天虚'] = (zidx('午') + yearZhiIndex) % 12;
   za['龙池'] = (zidx('辰') + yearZhiIndex) % 12;
@@ -268,28 +286,27 @@ export function computeZiwei(input) {
   za['截空2'] = zidx(JK[yearGanIndex][1]);
   za['天伤'] = (mingIndex + 8) % 12;
   za['天使'] = (mingIndex + 6) % 12;
-  za['台辅'] = (zidx('午') + yearZhiIndex) % 12;
 
   // —— 博士十二神 ——
   const BOSHI = ['博士', '力士', '青龙', '小耗', '将军', '奏书', '飞廉', '喜神', '病符', '大耗', '伏兵', '官府'];
   const maleFlag = src.gender !== 'female';
   const forwardShi = (GAN_YANG[yearGanIndex] && maleFlag) || (!GAN_YANG[yearGanIndex] && !maleFlag);
   const shiDir = forwardShi ? 1 : -1;
-  const boshiList = BOSHI.map((nm, i) => ({ name: nm, zi: (luZhi + shiDir * i + 360) % 12 }));
+  const boshiList = BOSHI.map((nm, i) => ({ name: nm, zi: (luZhi + shiDir * i + 360) % 12, subKind: '博士' }));
 
   // —— 长生十二神 ——
   const CHANG12 = ['长生', '沐浴', '冠带', '临官', '帝旺', '衰', '病', '死', '墓', '绝', '胎', '养'];
   const csStart = { 水二局: '申', 木三局: '亥', 金四局: '巳', 土五局: '申', 火六局: '寅' }[juName];
-  const changList = CHANG12.map((nm, i) => ({ name: nm, zi: (zidx(csStart) + shiDir * i + 360) % 12 }));
+  const changList = CHANG12.map((nm, i) => ({ name: nm, zi: (zidx(csStart) + shiDir * i + 360) % 12, subKind: '长生' }));
 
   // —— 将前十二星 ——
   const JIANG12 = ['将星', '攀鞍', '岁驿', '息神', '华盖', '劫煞', '灾煞', '天煞', '指背', '咸池', '月煞', '亡神'];
   const jiangStart = { 水: '子', 火: '午', 金: '酉', 木: '卯' }[sanhe(yearZhiIndex)];
-  const jiangList = JIANG12.map((nm, i) => ({ name: nm, zi: (zidx(jiangStart) + i) % 12 }));
+  const jiangList = JIANG12.map((nm, i) => ({ name: nm, zi: (zidx(jiangStart) + i) % 12, subKind: '将前' }));
 
   // —— 岁前十二星 ——
   const SUI12 = ['岁建', '晦气', '丧门', '贯索', '官符', '小耗', '大耗', '龙德', '白虎', '天德', '吊客', '病符'];
-  const suiList = SUI12.map((nm, i) => ({ name: nm, zi: (yearZhiIndex + i) % 12 }));
+  const suiList = SUI12.map((nm, i) => ({ name: nm, zi: (yearZhiIndex + i) % 12, subKind: '岁前' }));
 
   // 生年四化
   const hua = SIHUA[yearGanIndex];
@@ -338,23 +355,75 @@ export function computeZiwei(input) {
     const z = (mingIndex + i) % 12;
     const gzIndex = indexOfGanzhi(palaceGan[z], z);
     const gz = ganzhiOfIndex(gzIndex);
+    const flyHua = computeFlyHua(palaceGan[z], z);
+    palaceSihua[PALACE_ORDER[i]] = flyHua;
+
+    // 本宫离心自化（↓禄/权/科/忌）与对宫向心四化（↑禄/权/科/忌）
+    const selfHuaMap = {};
+    const oppFly = computeFlyHua(palaceGan[(z + 6) % 12], (z + 6) % 12);
+    const oppHuaMap = {};
+    for (const k of ['lu', 'quan', 'ke', 'ji']) {
+      if (flyHua[k] && flyHua[k].isSelf && flyHua[k].star) {
+        selfHuaMap[flyHua[k].star] = { type: k, label: flyHua[k].label };
+      }
+      if (oppFly[k] && oppFly[k].isOpposite && oppFly[k].star) {
+        oppHuaMap[oppFly[k].star] = { type: k, label: oppFly[k].label };
+      }
+    }
+
     const stars = [];
     for (const s of [...ZIWEI_STARS, ...TIANFU_STARS]) {
-      if (starAt[s.name] === z) stars.push({ name: s.name, kind: '主星', wuxing: s.wuxing, hua: huaMark[s.name] || null, brightness: (BRIGHTNESS[s.name] || '')[z] || null });
+      if (starAt[s.name] === z) {
+        stars.push({
+          name: s.name,
+          kind: '主星',
+          subKind: '主星',
+          wuxing: s.wuxing,
+          hua: huaMark[s.name] || null,
+          selfHua: selfHuaMap[s.name] || null,
+          oppHua: oppHuaMap[s.name] || null,
+          brightness: (BRIGHTNESS[s.name] || '')[z] || null,
+        });
+      }
     }
     for (const [nm, zi] of Object.entries(fuStars)) {
-      if (zi === z) stars.push({ name: nm, kind: '辅星', wuxing: fuWuxing(nm), hua: huaMark[nm] || null });
+      if (zi === z) {
+        stars.push({
+          name: nm,
+          kind: '辅星',
+          subKind: SHA_STARS.has(nm) ? '煞曜' : '吉曜',
+          wuxing: fuWuxing(nm),
+          hua: huaMark[nm] || null,
+          selfHua: selfHuaMap[nm] || null,
+          oppHua: oppHuaMap[nm] || null,
+          brightness: (FU_BRIGHTNESS[nm] || '')[z] || null,
+        });
+      }
     }
     for (const [nm, zi] of Object.entries(za)) {
-      if (zi === z) stars.push({ name: nm === '截空2' ? '截空' : nm, kind: '杂', wuxing: fuWuxing(nm === '截空2' ? '截空' : nm) });
+      if (zi === z) {
+        const cleanName = nm === '截空2' ? '截空' : nm;
+        const subKind = SHA_STARS.has(cleanName) ? '煞曜' : (cleanName === '天马' ? '吉曜' : '乙级');
+        stars.push({
+          name: cleanName,
+          kind: '杂',
+          subKind,
+          wuxing: fuWuxing(cleanName),
+          brightness: (FU_BRIGHTNESS[cleanName] || '')[z] || null,
+        });
+      }
     }
     for (const grp of [boshiList, changList, jiangList, suiList]) {
       for (const s of grp) {
-        if (s.zi === z) stars.push({ name: s.name, kind: '杂', wuxing: fuWuxing(s.name) });
+        if (s.zi === z) stars.push({ name: s.name, kind: '杂', subKind: s.subKind, wuxing: fuWuxing(s.name) });
       }
     }
-    const flyHua = computeFlyHua(palaceGan[z], z);
-    palaceSihua[PALACE_ORDER[i]] = flyHua;
+
+    const boshiObj = boshiList.find((s) => s.zi === z);
+    const changObj = changList.find((s) => s.zi === z);
+    const jiangObj = jiangList.find((s) => s.zi === z);
+    const suiObj = suiList.find((s) => s.zi === z);
+
     palaces[PALACE_ORDER[i]] = {
       name: PALACE_ORDER[i],
       zhiIndex: z,
@@ -363,6 +432,10 @@ export function computeZiwei(input) {
       gan: gz.gan,
       zhiName: ZHI[z],
       stars,
+      boshi: boshiObj ? boshiObj.name : '',
+      changsheng: changObj ? changObj.name : '',
+      jiangqian: jiangObj ? jiangObj.name : '',
+      suiqian: suiObj ? suiObj.name : '',
       flyHua,
       isMing: i === 0,
       isShen: z === shenIndex,
@@ -372,6 +445,7 @@ export function computeZiwei(input) {
   // 大限
   const yangYear = GAN_YANG[yearGanIndex];
   const male = src.gender !== 'female';
+  const yinYangGender = `${yangYear ? '阳' : '阴'}${male ? '男' : '女'}`;
   const forward = (yangYear && male) || (!yangYear && male === false);
   const birthYear = jdToYmdhms(jdUtc).year;
   const nowYear = new Date().getFullYear();
@@ -419,6 +493,8 @@ export function computeZiwei(input) {
   return {
     birthYear,
     xuAge,
+    yinYangGender,
+    ziDou: ZHI[ziDouIndex],
     mingZhu: MING_ZHU[ZHI[mingIndex]],
     shenZhu: SHEN_ZHU[ZHI[yearZhiIndex]],
     solarDate: (() => { const d = jdToYmdhms(Math.floor(jdSolar + 0.5)); return { year: d.year, month: d.month, day: d.day }; })(),
@@ -427,7 +503,7 @@ export function computeZiwei(input) {
       return { year: p.year.name, month: p.month.name, day: p.day.name, hour: p.hour.name };
     })(),
     mingGong: { zhi: ZHI[mingIndex], zhiIndex: mingIndex, ganzhi: ganzhiOfIndex(mingGzIndex).name },
-    shenGong: { zhi: ZHI[shenIndex], zhiIndex: shenIndex },
+    shenGong: { zhi: ZHI[shenIndex], zhiIndex: shenIndex, palace: zhiToPalaceName[shenIndex] || '' },
     lunar: {
       yearGanzhi: lunar.yearGanzhi,
       zodiac: lunar.zodiac,
@@ -470,9 +546,10 @@ function fuWuxing(name) {
   const m = {
     左辅: '土', 右弼: '水', 文昌: '金', 文曲: '水', 天魁: '火', 天钺: '火',
     禄存: '土', 擎羊: '金', 陀罗: '金', 火星: '火', 铃星: '火', 红鸾: '水', 天喜: '水',
+    地空: '火', 地劫: '火', 天马: '火', 天刑: '火', 天姚: '水',
   };
   return m[name] || '土';
 }
 
-// 1.5.0: Phase 2 精进 —— 火星/铃星按全书标准口诀精确安放 + 十二宫宫干四化飞星矩阵 (flyHua / palaceSihua)
-export const ZIWEI_ENGINE_VERSION = '1.5.0';
+// 1.6.0: Phase 6 精进 —— 文墨天机标准分层（吉曜/六煞亮度、本宫离心自化/对宫向心四化、博士/岁前/将前/长生独立成栏、子年斗君）
+export const ZIWEI_ENGINE_VERSION = '1.6.0';

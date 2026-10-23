@@ -597,7 +597,8 @@ const CSS = `
 
 /* 四柱核心专业盘表（一屏自适应） */
 .bz-mscroll{width:100%;overflow-x:auto}
-.bz-matrix{width:100%;border-collapse:collapse;margin-bottom:12px;table-layout:fixed;border-radius:10px;overflow:hidden}
+.bz-matrix{display:table!important;width:100%!important;white-space:normal!important;border-collapse:collapse;margin-bottom:12px;table-layout:fixed;border-radius:10px;overflow:hidden}
+.bz-matrix thead{display:table-header-group!important}.bz-matrix tbody{display:table-row-group!important}.bz-matrix tr{display:table-row!important}.bz-matrix th,.bz-matrix td{display:table-cell!important}
 .bz-matrix th,.bz-matrix td{border:1px solid #e5dbc7;padding:7px 4px;text-align:center;font-size:12px;background:#fffdf9;word-break:keep-all}
 .bz-matrix th{background:#f5efe2;font-weight:700;color:#6b5640;font-size:12px}
 .bz-matrix th.day-col,.bz-matrix td.day-col{background:#fdf7e7}

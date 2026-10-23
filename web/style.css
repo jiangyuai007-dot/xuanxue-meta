@@ -1222,3 +1222,273 @@ th{background:var(--gold-soft);color:var(--gold-ink);font-weight:600}
     display: none !important;
   }
 }
+
+
+/* ==========================================================================
+   Phase 6 (v2.1)：东方命理起盘台卡片化重构 + 快捷命例条 + 合盘零留白操作栏
+   ========================================================================== */
+
+.formbar {
+  background: transparent;
+  border-bottom: none;
+  box-shadow: none;
+  padding: 12px 20px 4px;
+}
+.formbar.is-collapsed {
+  padding: 0;
+  background: linear-gradient(120deg, #fbf6ea, var(--gold-soft));
+  border-bottom: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-sm);
+}
+.fb-card {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 14px 20px 12px;
+  background: linear-gradient(180deg, #fffdf9 0%, #f9f3e5 100%);
+  border: 1px solid var(--line-strong, #d8cba9);
+  border-top: 3px solid var(--gold, #b0812b);
+  border-radius: 14px;
+  box-shadow: 0 10px 26px -16px rgba(60, 42, 14, 0.25);
+  display: flex;
+  gap: 12px 22px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.formbar .form-summary-bar {
+  max-width: 1260px;
+  margin: 0 auto 8px;
+  border: 1px solid var(--line-strong, #d8cba9);
+  border-radius: 10px;
+  padding: 8px 16px;
+}
+.formbar.is-collapsed .form-summary-bar {
+  max-width: 1440px;
+  margin: 0 auto;
+  border: none;
+  border-radius: 0;
+}
+
+/* 顶部快捷命例与历法状态条 (.fb-quick-bar) */
+.fb-quick-bar {
+  flex: 0 0 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  margin-bottom: 2px;
+  border-bottom: 1px dashed #e2d5bc;
+}
+.fbq-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.fbq-seal {
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 700;
+  color: #241d14;
+  background: linear-gradient(135deg, #f5ead2, #ead7b1);
+  border: 1px solid #d1b882;
+  padding: 2px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.fbq-meta {
+  font-size: 12px;
+  color: var(--ink-2, #6b5640);
+}
+.fbq-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.fbq-chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  height: 28px;
+  border-radius: 999px;
+  background: #fffdf8;
+  border: 1px solid #d8cba9;
+  color: #5c472c;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+.fbq-chip:hover {
+  background: var(--gold-soft, #f3e8cf);
+  border-color: var(--gold, #b0812b);
+  color: #241d14;
+  transform: translateY(-1px);
+}
+
+/* 紧凑型右侧操作区：主按钮并排，消除表单下方垂直空白黑洞 */
+.fb-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding-left: 18px;
+  border-left: 1px dashed var(--line-strong);
+  align-self: center;
+  min-width: 248px;
+}
+.fb-actions .act-label {
+  display: none;
+}
+.fb-actions .act-row-main {
+  flex-direction: row;
+  gap: 8px;
+}
+.fb-actions .act-row-main .primary {
+  flex: 1.25;
+  font-size: 15px;
+  padding: 8px 16px;
+  height: 40px;
+  white-space: nowrap;
+}
+.fb-actions .act-row-main #btnReport {
+  flex: 1;
+  font-size: 13.5px;
+  padding: 8px 12px;
+  height: 40px;
+  white-space: nowrap;
+}
+.fb-actions .act-row-aux button {
+  padding: 4px 8px;
+  font-size: 12px;
+  min-height: 28px;
+  white-space: nowrap;
+}
+
+/* 表单主输入区：桌面端强制横向舒展，不挤成竖条 */
+.fb-fields {
+  flex: 1 1 680px;
+  align-items: center;
+  gap: 10px 20px;
+}
+/* 底部说明条紧凑收口 */
+.fb-hint {
+  flex: 0 0 100%;
+  font-size: 11.5px;
+  color: var(--sub);
+  margin: 0;
+  padding: 2px 0 0;
+  line-height: 1.4;
+}
+.fb-card > .fb-hint:first-of-type {
+  border-top: 1px dotted #e6dbc5;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+/* 合盘专属：修复合盘按钮掉到第二行右侧导致左侧 1000px 大空白的问题 */
+body[data-sys="hepan"] .fb-actions {
+  flex: 0 0 100%;
+  width: 100%;
+  margin-left: 0;
+  padding: 10px 14px;
+  border-left: none;
+  background: linear-gradient(90deg, #faf4e6 0%, #f5ebd4 100%);
+  border: 1px solid #dfd1b2;
+  border-radius: 10px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+body[data-sys="hepan"] .fb-actions .act-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #6b5432;
+  height: auto;
+  letter-spacing: 0.5px;
+}
+body[data-sys="hepan"] .fb-actions .act-label::before {
+  content: "✦ 双人四柱合参 · 天干五合 · 地支六合三合 · 夫妻宫十神 · 六维契合度雷达";
+  margin-right: 4px;
+}
+body[data-sys="hepan"] .fb-actions .act-row-main {
+  width: auto;
+  flex: 0 0 auto;
+  gap: 10px;
+}
+body[data-sys="hepan"] .fb-actions .act-row-main .primary {
+  min-width: 136px;
+}
+body[data-sys="hepan"] .fb-actions .act-row-main #btnReport {
+  min-width: 116px;
+}
+body[data-sys="hepan"] .fb-actions .act-row-aux {
+  width: auto;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+body[data-sys="hepan"] .fb-actions .act-row-aux button {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  height: 36px;
+}
+
+@media (max-width: 820px) {
+  .formbar {
+    padding: 8px 8px 2px;
+  }
+  .fb-card {
+    padding: 10px 12px 10px;
+    gap: 10px;
+  }
+  .fbq-meta {
+    display: none;
+  }
+  .fbq-right {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+  .fbq-chip {
+    flex: 0 0 auto;
+  }
+  .fb-actions,
+  body[data-sys="hepan"] .fb-actions {
+    width: 100%;
+    min-width: 0;
+    padding: 10px 0 0;
+    border-left: none;
+    border-top: 1px dashed var(--line-strong);
+    background: transparent;
+    border-radius: 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  body[data-sys="hepan"] .fb-actions .act-label {
+    display: none;
+  }
+  body[data-sys="hepan"] .fb-actions .act-row-main,
+  body[data-sys="hepan"] .fb-actions .act-row-aux {
+    width: 100%;
+  }
+  .fb-card > .fb-hint:first-of-type,
+  .fb-card > .fb-hint:last-of-type {
+    flex: 0 0 100%;
+    text-align: left;
+    border-top: none;
+    padding-top: 2px;
+  }
+}

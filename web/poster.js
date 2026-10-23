@@ -166,9 +166,16 @@
       if (badge) badge.textContent = opts.badge || '已排盘';
       if (text) text.textContent = opts.summary || '';
       bar.style.display = 'flex';
-      formbar.classList.add('is-collapsed');
       var expBtn = document.getElementById('btnExpandForm');
-      if (expBtn) expBtn.textContent = '展开修改';
+      if (window.__xjAutoPreviewing) {
+        window.__xjAutoPreviewing = false;
+        if (badge) badge.textContent = '实时命盘预览';
+        formbar.classList.remove('is-collapsed');
+        if (expBtn) expBtn.textContent = '收起表单';
+      } else {
+        formbar.classList.add('is-collapsed');
+        if (expBtn) expBtn.textContent = '展开修改';
+      }
     }
     if (typeof opts.onPoster === 'function') {
       latestPosterTrigger = opts.onPoster;
@@ -948,13 +955,204 @@
 
   window.__xjSyncPhase4Context = syncPhase4Context;
 
+
+  function ensureQuickCastBar() {
+    var curSys = (document.body && document.body.dataset && document.body.dataset.sys) || '';
+    if (!curSys || curSys === 'mine') return null;
+    var fbCard = document.querySelector('.fb-card');
+    if (!fbCard || document.getElementById('xjQuickCastBar')) return null;
+
+    var cfgMap = {
+      bazi: {
+        seal: '☯ 四柱八字 · 子平真太阳时起盘台',
+        meta: '节气交脱分秒定局 · 110项古籍神煞 · 六柱岁运同参',
+        chips: [
+          { act: 'now', label: '⚡ 此刻时辰起盘' },
+          { act: 'male', label: '👨 经典乾造命例' },
+          { act: 'female', label: '👩 经典坤造命例' },
+          { act: 'alm', label: '📅 今日黄历宜忌' },
+        ],
+      },
+      ziwei: {
+        seal: '✦ 紫微斗数 · 文墨天机全星起盘台',
+        meta: '108颗星曜竖排成列 · 十二宫本宫自化与向心四化 · 博士长生三神叠列',
+        chips: [
+          { act: 'now', label: '⚡ 此刻时辰排盘' },
+          { act: 'male', label: '👨 紫贪格男命例' },
+          { act: 'female', label: '👩 机月同梁女命例' },
+          { act: 'alm', label: '📅 今日黄历宜忌' },
+        ],
+      },
+      liuyao: {
+        seal: '䷀ 六爻纳甲 · 京房易占演卦台',
+        meta: '时间 / 报数 / 铜钱 / 手动 / 卦名五法齐备 · 旺相休囚死与应期直断',
+        chips: [
+          { act: 'ly-now', label: '⚡ 此刻正时起卦' },
+          { act: 'ly-auto', label: '🎲 随机铜钱演卦' },
+          { act: 'ly-num', label: '🔢 梅花报数示例' },
+          { act: 'alm', label: '📅 今日黄历宜忌' },
+        ],
+      },
+      qimen: {
+        seal: '☷ 奇门遁甲 · 时家转飞起局台',
+        meta: '拆补 / 置闰 / 茅山三法定局 · 二十余种吉凶克应格局自动推演',
+        chips: [
+          { act: 'qm-now', label: '⚡ 此刻正时起局' },
+          { act: 'qm-career', label: '💼 事业求财局例' },
+          { act: 'qm-love', label: '❤️ 婚恋感情局例' },
+          { act: 'alm', label: '📅 今日黄历宜忌' },
+        ],
+      },
+      hepan: {
+        seal: '囍 八字合婚 · 双人命局同参台',
+        meta: '天干五合 · 地支六合三合刑冲 · 日柱夫妻宫配合 · 六维契合度雷达',
+        chips: [
+          { act: 'hp-demo1', label: '💑 天作之合命例' },
+          { act: 'hp-demo2', label: '🔥 互补磨合命例' },
+          { act: 'hp-swap', label: '🔄 甲乙双方互换' },
+          { act: 'alm', label: '📅 婚嫁择日黄历' },
+        ],
+      },
+    };
+
+    var cfg = cfgMap[curSys];
+    if (!cfg) return null;
+
+    var qbar = document.createElement('div');
+    qbar.id = 'xjQuickCastBar';
+    qbar.className = 'fb-quick-bar';
+    qbar.innerHTML =
+      '<div class="fbq-left">' +
+        '<span class="fbq-seal">' + esc(cfg.seal) + '</span>' +
+        '<span class="fbq-meta">' + esc(cfg.meta) + '</span>' +
+      '</div>' +
+      '<div class="fbq-right">' +
+        cfg.chips.map(function (c) {
+          return '<button type="button" class="fbq-chip" data-qact="' + esc(c.act) + '">' + esc(c.label) + '</button>';
+        }).join('') +
+      '</div>';
+
+    fbCard.insertBefore(qbar, fbCard.firstChild);
+
+    function setVal(id, v) {
+      var el = document.getElementById(id);
+      if (el) el.value = v;
+    }
+    function setNowFields() {
+      var d = new Date();
+      setVal('year', d.getFullYear());
+      setVal('month', d.getMonth() + 1);
+      setVal('day', d.getDate());
+      setVal('hour', d.getHours());
+      setVal('minute', d.getMinutes());
+    }
+    function clickPaipan() {
+      var btn = document.getElementById('btnPaipan');
+      if (btn && !btn.disabled) btn.click();
+    }
+
+    qbar.addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('button[data-qact]') : null;
+      if (!btn) return;
+      var act = btn.getAttribute('data-qact');
+      if (act === 'alm') {
+        openAlmanacModal();
+        return;
+      }
+      if (act === 'now' || act === 'qm-now') {
+        setNowFields();
+        clickPaipan();
+      } else if (act === 'male') {
+        setVal('gender', 'male');
+        setVal('calendar', 'gregorian');
+        setVal('year', 1990); setVal('month', 5); setVal('day', 20); setVal('hour', 14); setVal('minute', 30);
+        setVal('city', '北京');
+        clickPaipan();
+      } else if (act === 'female') {
+        setVal('gender', 'female');
+        setVal('calendar', 'gregorian');
+        setVal('year', 1993); setVal('month', 8); setVal('day', 16); setVal('hour', 9); setVal('minute', 30);
+        setVal('city', '上海');
+        clickPaipan();
+      } else if (act === 'ly-now') {
+        var segBtn = document.querySelector('#methodSeg button[data-v="time"]');
+        if (segBtn) segBtn.click();
+        setNowFields();
+        setVal('question', '近期事业变动与财运顺逆如何？');
+        clickPaipan();
+      } else if (act === 'ly-auto') {
+        var autoBtn = document.querySelector('#methodSeg button[data-v="auto"]');
+        if (autoBtn) autoBtn.click();
+        setVal('question', '所占事项吉凶与应期何时？');
+        clickPaipan();
+      } else if (act === 'ly-num') {
+        var numBtn = document.querySelector('#methodSeg button[data-v="number"]');
+        if (numBtn) numBtn.click();
+        setVal('n1', 168); setVal('n2', 329);
+        setVal('question', '合作求财能否顺利达成？');
+        clickPaipan();
+      } else if (act === 'qm-career') {
+        setVal('purpose', 'career');
+        setVal('juMethod', 'chaibu');
+        setVal('panType', 'zhuan');
+        clickPaipan();
+      } else if (act === 'qm-love') {
+        setVal('purpose', 'marriage');
+        setVal('juMethod', 'zhirun');
+        setVal('panType', 'zhuan');
+        clickPaipan();
+      } else if (act === 'hp-demo1') {
+        setVal('aName', '林先生'); setVal('aGender', 'male');
+        setVal('aYear', 1990); setVal('aMonth', 5); setVal('aDay', 20); setVal('aHour', 10); setVal('aMinute', 30);
+        setVal('bName', '苏女士'); setVal('bGender', 'female');
+        setVal('bYear', 1993); setVal('bMonth', 3); setVal('bDay', 8); setVal('bHour', 14); setVal('bMinute', 20);
+        clickPaipan();
+      } else if (act === 'hp-demo2') {
+        setVal('aName', '周先生'); setVal('aGender', 'male');
+        setVal('aYear', 1988); setVal('aMonth', 11); setVal('aDay', 12); setVal('aHour', 8); setVal('aMinute', 15);
+        setVal('bName', '陈女士'); setVal('bGender', 'female');
+        setVal('bYear', 1992); setVal('bMonth', 6); setVal('bDay', 25); setVal('bHour', 16); setVal('bMinute', 40);
+        clickPaipan();
+      } else if (act === 'hp-swap') {
+        var fields = ['Name', 'Gender', 'Calendar', 'Year', 'Month', 'Day', 'Hour', 'Minute', 'City'];
+        fields.forEach(function (f) {
+          var ea = document.getElementById('a' + f);
+          var eb = document.getElementById('b' + f);
+          if (ea && eb) {
+            var tmp = ea.value;
+            ea.value = eb.value;
+            eb.value = tmp;
+          }
+        });
+        clickPaipan();
+      }
+    });
+
+    return qbar;
+  }
+
+  function autoPreviewInitialChart() {
+    var curSys = (document.body && document.body.dataset && document.body.dataset.sys) || '';
+    if (!curSys || curSys === 'mine') return;
+    setTimeout(function () {
+      var chartEl = document.getElementById('chart');
+      var btn = document.getElementById('btnPaipan');
+      if (btn && !btn.disabled && chartEl && !chartEl.innerHTML.trim()) {
+        window.__xjAutoPreviewing = true;
+        btn.click();
+      }
+    }, 90);
+  }
+
   function boot() {
     registerPwa();
     injectMobileTabBar();
     injectTopbarAlmanacBtn();
     ensureFormSummaryBar();
+    ensureQuickCastBar();
     ensureStageViewTabs();
     ensureFollowupBox();
+    autoPreviewInitialChart();
   }
 
   if (document.readyState === 'loading') {
