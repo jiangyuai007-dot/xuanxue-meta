@@ -7,8 +7,8 @@
  *   3. POST /api/paipan 与 /api/hepan 采用 Network-First + 请求体摘要缓存，断网时可重放已排过的命盘。
  */
 
-const CACHE_STATIC = 'xuanji-static-v3';
-const CACHE_API = 'xuanji-api-v3';
+const CACHE_STATIC = 'xuanji-static-v2.0';
+const CACHE_API = 'xuanji-api-v2.0';
 
 const PRECACHE_URLS = [
   '/bazi.html',

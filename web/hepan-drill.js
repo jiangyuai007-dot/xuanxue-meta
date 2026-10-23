@@ -612,6 +612,22 @@ async function checkService() {
   }
 }
 
+function openHepanPoster() {
+  if (!PAN || !PAN.factPackId) return msg('请先合盘。', true);
+  if (typeof window.__xjOpenPosterModal === 'function') {
+    const names = (lastHepanInput && lastHepanInput.names) || {};
+    window.__xjOpenPosterModal({
+      system: 'hepan',
+      factPackId: PAN.factPackId,
+      reportToken: currentReportToken,
+      facts: PAN,
+      subHeader: `${names.a || '甲方'} × ${names.b || '乙方'} · 八字合盘契合度推演`,
+    });
+  } else {
+    window.open(`/api/report/${PAN.factPackId}/sharecard.svg?t=${encodeURIComponent(currentReportToken)}`, '_blank');
+  }
+}
+
 async function init() {
   await checkService();
   try {
@@ -632,21 +648,7 @@ async function init() {
   $('btnPaipan').onclick = runPaipan;
   $('btnReport').onclick = runReport;
 
-function openHepanPoster() {
-  if (!PAN || !PAN.factPackId) return msg('请先合盘。', true);
-  if (typeof window.__xjOpenPosterModal === 'function') {
-    const names = (lastHepanInput && lastHepanInput.names) || {};
-    window.__xjOpenPosterModal({
-      system: 'hepan',
-      factPackId: PAN.factPackId,
-      reportToken: currentReportToken,
-      facts: PAN,
-      subHeader: `${names.a || '甲方'} × ${names.b || '乙方'} · 八字合盘契合度推演`,
-    });
-  } else {
-    window.open(`/api/report/${PAN.factPackId}/sharecard.svg?t=${encodeURIComponent(currentReportToken)}`, '_blank');
-  }
-}
+
 
   $('btnCard').onclick = openHepanPoster;
   if ($('btnSaveReport')) $('btnSaveReport').onclick = saveHepanToMyReports;

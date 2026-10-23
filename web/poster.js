@@ -102,6 +102,9 @@
     if (curSys === 'mine') return null;
     var wb = document.querySelector('.workbench');
     if (!wb) return null;
+    if (!wb.getAttribute('data-mview')) {
+      wb.setAttribute('data-mview', 'chart');
+    }
     var tabs = document.getElementById('stageViewTabs');
     if (tabs) return tabs;
     tabs = document.createElement('div');
@@ -111,8 +114,9 @@
     tabs.setAttribute('aria-label', '移动端视图切换');
     tabs.innerHTML =
       '<button type="button" role="tab" data-mview="chart" class="sv-tab on" aria-selected="true">① 专业命盘</button>' +
-      '<button type="button" role="tab" data-mview="report" class="sv-tab" aria-selected="false">② AI 深度命书</button>' +
-      '<button type="button" role="tab" data-mview="profile" class="sv-tab" aria-selected="false">③ 我的档案</button>';
+      '<button type="button" role="tab" data-mview="report" class="sv-tab" aria-selected="false">② AI 命书</button>' +
+      '<button type="button" role="tab" data-mview="chat" class="sv-tab" aria-selected="false">③ 大师追问</button>' +
+      '<button type="button" role="tab" data-mview="profile" class="sv-tab" aria-selected="false">④ 档案</button>';
     wb.insertBefore(tabs, wb.firstChild);
     tabs.addEventListener('click', function (e) {
       var btn = e.target.closest ? e.target.closest('button[data-mview]') : null;
@@ -150,6 +154,9 @@
    */
   window.__xjCollapseForm = function (opts) {
     opts = opts || {};
+    if (document.body) document.body.classList.add('has-paipan');
+    var rh = document.getElementById('resultHead');
+    if (rh) rh.style.display = 'none';
     var bar = ensureFormSummaryBar();
     ensureStageViewTabs();
     var formbar = document.querySelector('.formbar');

@@ -151,8 +151,10 @@ function localFollowupAnswer(factPack, question, factLines) {
     const ys = f.yongshen || {};
     const fav = (ys.favorable || []).join('、') || '水、木';
     const unfav = (ys.unfavorable || []).join('、') || '火、土';
-    const curDy = (f.dayun?.list || [])[0] || {};
-    const curLn = (f.liunian || [])[0] || {};
+    const nowY = new Date().getFullYear();
+    const steps = f.dayun?.steps || f.dayun?.list || [];
+    const curDy = steps.find((s) => nowY >= s.fromYear && nowY <= s.toYear) || steps[0] || {};
+    const curLn = (f.liunian || []).find((l) => l.year === nowY) || (f.liunian || [])[0] || { year: nowY, name: "", shishen: "" };
 
     if (intent === 'career') {
       basis = pickBasis(['格局', '喜用神', '大运', '十神']);
