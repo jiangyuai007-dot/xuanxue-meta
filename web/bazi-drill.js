@@ -122,7 +122,7 @@
       html += '<span class="bz-lym" data-i="' + i + '" data-m=\'' + JSON.stringify(m) + '\''
         + ' title="' + MN[i] + '（' + m[1] + '年' + m[2] + '月' + m[3] + '日起，共' + m[4] + '天）· 点击展开流日">'
         + '<em>' + MN[i] + '</em>'
-        + '<b style="color:' + colOf(g) + '">' + GAN[g] + ZHI[z] + '</b>'
+        + '<b>' + colorGzHtml(GAN[g] + ZHI[z]) + '</b>'
         + '<i>' + shishen(dm, g) + '·' + shishen(dm, benGan) + '</i></span>';
     }
     bar.innerHTML = html;
@@ -146,7 +146,7 @@
       var dt = new Date(d0.getTime() + k * 86400000);
       html += '<span class="bz-lri" title="' + (dt.getMonth() + 1) + '月' + dt.getDate() + '日 ' + GAN[g] + ZHI[z] + '">'
         + '<em>' + (dt.getMonth() + 1) + '/' + dt.getDate() + '</em>'
-        + '<span style="color:' + colOf(g) + '">' + GAN[g] + ZHI[z] + '</span>'
+        + '<span>' + colorGzHtml(GAN[g] + ZHI[z]) + '</span>'
         + '<i>' + shishen(dm, g) + '</i></span>';
     }
     grid.innerHTML = html + '</div>';

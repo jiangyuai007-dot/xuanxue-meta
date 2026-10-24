@@ -1,18 +1,21 @@
 /**
- * 奇门遁甲九宫盘 —— 适老高对比度纯墨版 v2.5
+ * 奇门遁甲九宫盘 —— 天干地支五行着色 + 星门神纯墨 + 九宫单宫无横线清爽版 v2.6
  *
- * 用户视角重构：
- *   1. 四柱区域（年柱/月柱/日柱/时柱的干支、藏干、空亡）全部统一采用高对比度玄墨黑（#1f1a14），杜绝花哨五色干扰；
- *   2. 九宫格内的「八神、九星、八门、天盘干、地盘干」统一采用同一高对比度浓墨色（#1f1a14），字号适度放大，对长辈与专业易友极度友好。
+ * 视觉规范：
+ *   1. 天干地支（四柱干支、藏干、顶栏四干、九宫天盘干与地盘干）恢复传统五行颜色（木绿/火红/土褐/金黄/水蓝）；
+ *   2. 九宫格内的「八神、九星、八门」保持统一浓墨色（#1f1a14），主次分明、不杂乱；
+ *   3. 九宫格单宫内部去掉所有横向分割线（.qr / .qg 无 border-top），宫面通透干净。
  */
 
-import { esc, list } from './shared.js';
+import { esc, list, WX_COLOR } from './shared.js';
 import {
   STAR_INFO, DOOR_INFO, SHEN_INFO, GAN_INFO, SIHAI_INFO,
   comboOf, CHANG12_INFO, DOOR_WX,
 } from '../../core/qimenInfo.js';
 
+const elColor = (e) => WX_COLOR[e] || '#1f1a14';
 const PALACE_WX = { 1: '水', 2: '土', 3: '木', 4: '木', 6: '金', 7: '金', 8: '土', 9: '火' };
+const ZHI_EL = { 子: '水', 丑: '土', 寅: '木', 卯: '木', 辰: '土', 巳: '火', 午: '火', 未: '土', 申: '金', 酉: '金', 戌: '土', 亥: '水' };
 
 const ZHI_INFO = {
   子: '子水：阳水，正北方，司仲冬。象意：暗昧、机谋、暗藏、流动；生肖鼠。',
@@ -56,9 +59,9 @@ const CSS = `
 .qm2 .hd .b i b{color:var(--ink);font-weight:700}
 .qm2 .hd-stems{position:absolute;right:0;top:50%;transform:translateY(-50%);font-size:11.5px;color:#5c5243;text-align:right;line-height:1.4}
 .qm2 .hd-stems .lab{color:#8a7e68;margin-right:3px}
-.qm2 .hd-stems b{font-family:"Noto Serif SC",serif;font-size:14px;font-weight:800;color:var(--ink);margin:0 1px}
+.qm2 .hd-stems b{font-family:"Noto Serif SC",serif;font-size:14px;font-weight:800;margin:0 1px}
 .qm2 .hd-stems .sgap{color:#c9bda3;margin:0 1px}
-/* 四柱表：全部采用统一玄墨色（#1f1a14），清晰醒目 */
+/* 四柱表：天干地支与藏干采用五行着色 */
 .qm2 .sz{display:grid;grid-template-columns:52px repeat(4,1fr);border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;overflow:hidden;margin:0 12px 8px;background:#fffdf8}
 .qm2 .sz>div{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 4px;border-bottom:1px solid #f0e8d6;font-size:12.5px;min-width:0}
 .qm2 .sz>div:nth-child(-n+5){background:#fbf6ea}
@@ -66,14 +69,14 @@ const CSS = `
 .qm2 .sz .h{font-size:12.5px;font-weight:700;color:#4a3f30;letter-spacing:2px;text-indent:2px}
 .qm2 .sz .rc{flex-direction:column;gap:2px}
 .qm2 .sz .vcol{padding:8px 4px 6px;gap:0}
-.qm2 .sz .gan,.qm2 .sz .zhi{font-family:"Noto Serif SC",serif;font-size:24px;font-weight:800;line-height:1.25;color:var(--ink) !important;cursor:pointer;border-radius:6px;padding:0 6px}
-.qm2 .sz .xk{font-size:13px;font-weight:600;color:var(--ink) !important;letter-spacing:2px;text-indent:2px}
-.qm2 .sz .cg{font-family:"Noto Serif SC",serif;font-size:14px;font-weight:700;color:var(--ink) !important;letter-spacing:2px;text-indent:2px;white-space:nowrap}
-.qm2 .sz .cg i{font-style:normal;color:var(--ink) !important;cursor:pointer;padding:0 1px}
+.qm2 .sz .gan,.qm2 .sz .zhi{font-family:"Noto Serif SC",serif;font-size:24px;font-weight:800;line-height:1.25;cursor:pointer;border-radius:6px;padding:0 6px}
+.qm2 .sz .xk{font-size:13px;font-weight:600;color:#6e6250;letter-spacing:2px;text-indent:2px}
+.qm2 .sz .cg{font-family:"Noto Serif SC",serif;font-size:14px;font-weight:700;letter-spacing:2px;text-indent:2px;white-space:nowrap}
+.qm2 .sz .cg i{font-style:normal;cursor:pointer;padding:0 1px}
 .qm2 .meth{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin:0 12px 10px}
 .qm2 .meth i{font-style:normal;font-size:11.5px;background:#f7f2e7;border:1px solid var(--line);border-radius:5px;padding:2px 8px;color:#5c5243}
 .qm2 .meth i b{color:var(--ink)}
-/* 九宫格：星、门、神、天盘干、地盘干统一采用同一浓墨色（var(--ink)） */
+/* 九宫格：单宫去掉内部横线（.qr / .qg 无 border-top），天干五行着色，八神九星八门统一浓墨色 */
 .qm2 .g9{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:2px 12px 12px}
 .qm2 .qp{--rh:22px;--rs:26px;--rt:26px;--rd:30px;
   --fs:16.5px;--fs-name:12px;--fs-tag:9px;
@@ -83,7 +86,7 @@ const CSS = `
 .qm2 .qp.mid{background:#f8f4ea;border-style:dashed}
 .qm2 .qp.vf{box-shadow:0 0 0 2px var(--gold);border-color:var(--gold)}
 .qm2 .qp.shi{background:#fffcf2}
-.qm2 .qr{display:flex;align-items:center;justify-content:center;min-width:0;border-top:1px solid var(--sep)}
+.qm2 .qr{display:flex;align-items:center;justify-content:center;min-width:0;border-top:none}
 .qm2 .qel{cursor:pointer;border-radius:6px;display:inline-flex;align-items:center;justify-content:center}
 .qm2 .qh{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden}
 .qm2 .qn{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:3px;white-space:nowrap;overflow:hidden}
@@ -97,8 +100,8 @@ const CSS = `
 .qm2 .qtag i.v{background:var(--gold)}
 .qm2 .qtag i.k,.qm2 .qtag i.m,.qm2 .qtag i.p{background:#8c3b2b}
 .qm2 .qtag i.d,.qm2 .qtag i.x{background:#6e5832}
-/* 统一星、门、神、天干地干为同一浓墨色 */
-.qm2 .qs,.qm2 .qstar,.qm2 .qd,.qm2 .qgan b{
+/* 八神、九星、八门统一浓墨色；天盘干与地盘干采用五行颜色 */
+.qm2 .qs,.qm2 .qstar,.qm2 .qd{
   font-family:"Noto Serif SC",serif;
   font-size:var(--fs);
   font-weight:800;
@@ -106,9 +109,16 @@ const CSS = `
   white-space:nowrap;
   color:var(--ink) !important;
 }
+.qm2 .qgan b{
+  font-family:"Noto Serif SC",serif;
+  font-size:var(--fs);
+  font-weight:800;
+  line-height:1;
+  white-space:nowrap;
+}
 .qm2 .qdoor-row{display:flex;align-items:center;justify-content:flex-end;padding-right:12px}
 .qm2 .qd{position:relative;line-height:1}
-.qm2 .qg{display:flex;flex-direction:column;justify-content:center;gap:10px;min-width:0;border-top:1px solid var(--sep)}
+.qm2 .qg{display:flex;flex-direction:column;justify-content:center;gap:10px;min-width:0;border-top:none}
 .qm2 .qgan{display:flex;align-items:center;justify-content:flex-start;gap:5px;padding-left:14px;min-width:0}
 .qm2 .qdash{font-size:var(--fs);color:#b8ad98;line-height:1}
 .qm2 .mk,.qm2 .qcs,.qm2 .qpat{font-style:normal;text-decoration:none;font-size:9.5px;line-height:1.45;border-radius:3px;padding:0 3px;white-space:nowrap;flex:0 0 auto;color:#5c4e38;background:#f4ede0;border:1px solid #dfd3bc}
@@ -213,7 +223,7 @@ export function renderQimen(f) {
     if (p.isMiddle) {
       const midTian = p.tianPan
         ? el(`中宫天盘干「${esc(p.tianPan)}」`, `${GAN_INFO[p.tianPan]?.text || ''}　飞盘奇门中五宫天盘之干。`,
-            `<b>${esc(p.tianPan)}</b>${markHtml(p.tianMarks)}`, 'qgan ti')
+            `<b style="color:${elColor(GAN_INFO[p.tianPan]?.wx || '')}">${esc(p.tianPan)}</b>${markHtml(p.tianMarks)}`, 'qgan ti')
         : el('中宫无天盘干', '转盘奇门中五宫不参与天盘旋转，寄宫论。', '<span class="qdash">—</span>', 'qgan ti');
       return `<div class="qp mid${p.isZhiFu ? ' vf' : ''}${p.isZhiShi ? ' shi' : ''}">
         <div class="qh">${el('5·中宫（太极中枢）',
@@ -226,7 +236,7 @@ export function renderQimen(f) {
         <div class="qg">
           ${midTian}
           ${el(`中宫地盘干「${esc(p.diPan || '—')}」`, `${GAN_INFO[p.diPan]?.text || ''}　中五宫地盘之干。`,
-            `<b>${esc(p.diPan || '—')}</b>${markHtml(p.diMarks)}`, 'qgan di')}
+            `<b style="color:${elColor(GAN_INFO[p.diPan]?.wx || '')}">${esc(p.diPan || '—')}</b>${markHtml(p.diMarks)}`, 'qgan di')}
         </div>
         <div class="qr qdoor-row">${el('中宫无八门', '中五宫不入八门排布。', '<span class="qdash">—</span>')}</div>
       </div>`;
@@ -249,12 +259,12 @@ export function renderQimen(f) {
         `<span>${esc(p.star || '—')}</span>`, 'qstar')}</div>
       <div class="qg">
         ${el(`天盘干「${esc(p.tianPan || '—')}」加${esc(p.name)}宫`, tianText,
-          `<b>${esc(p.tianPan || '—')}</b>`
+          `<b style="color:${elColor(GAN_INFO[p.tianPan]?.wx || '')}">${esc(p.tianPan || '—')}</b>`
           + markHtml(p.tianMarks)
           + (p.changsheng ? `<u class="qcs qm-el" data-t="十二长生「${esc(p.changsheng)}」" data-x="${esc(p.changsheng)}：${esc(CHANG12_INFO[p.changsheng] || '')}（以天盘干对本宫地支而言）">${esc(p.changsheng)}</u>` : ''),
           'qgan ti')}
         ${el(`地盘干「${esc(p.diPan || '—')}」（${esc(p.name)}宫原始之干）`, GAN_INFO[p.diPan]?.text || '',
-          `<b>${esc(p.diPan || '—')}</b>` + markHtml(p.diMarks) + patBadge,
+          `<b style="color:${elColor(GAN_INFO[p.diPan]?.wx || '')}">${esc(p.diPan || '—')}</b>` + markHtml(p.diMarks) + patBadge,
           'qgan di')}
       </div>
       <div class="qr qdoor-row">${el(`八门「${esc(p.door || '—')}」`, `${doorInfo.text || ''}${p.menPo ? '　〔当前门迫，力量受损〕' : ''}`,
@@ -284,8 +294,8 @@ export function renderQimen(f) {
     const p = fp[k];
     if (!p) return `<div class="rc vcol"><span class="gan">—</span><span class="zhi">—</span></div>`;
     return `<div class="rc vcol">
-      <span class="gan qm-el" data-t="年月日时干「${esc(p.gan)}」（${lab}柱天干）" data-x="${esc(GAN_INFO[p.gan]?.text || '')}">${esc(p.gan)}</span>
-      <span class="zhi qm-el" data-t="地支「${esc(p.zhi)}」（${lab}柱地支）" data-x="${esc(ZHI_INFO[p.zhi] || '')}">${esc(p.zhi)}</span>
+      <span class="gan qm-el" data-t="年月日时干「${esc(p.gan)}」（${lab}柱天干）" data-x="${esc(GAN_INFO[p.gan]?.text || '')}" style="color:${elColor(GAN_INFO[p.gan]?.wx)}">${esc(p.gan)}</span>
+      <span class="zhi qm-el" data-t="地支「${esc(p.zhi)}」（${lab}柱地支）" data-x="${esc(ZHI_INFO[p.zhi] || '')}" style="color:${elColor(ZHI_EL[p.zhi])}">${esc(p.zhi)}</span>
     </div>`;
   }).join('');
   const colCg = LABELS.map(([k, lab]) => {
@@ -293,7 +303,7 @@ export function renderQimen(f) {
     const cang = list(p?.canggan);
     if (!cang.length) return `<div class="rc"><span class="cg">—</span></div>`;
     return `<div class="rc"><span class="cg">${cang.map((g) =>
-      `<i class="qm-el" data-t="${lab}柱地支「${esc(p.zhi)}」藏干·${esc(g)}" data-x="${esc(GAN_INFO[g]?.text || '')}（${esc(p.zhi)}支藏干，本气在前）">${esc(g)}</i>`
+      `<i class="qm-el" data-t="${lab}柱地支「${esc(p.zhi)}」藏干·${esc(g)}" data-x="${esc(GAN_INFO[g]?.text || '')}（${esc(p.zhi)}支藏干，本气在前）" style="color:${elColor(GAN_INFO[g]?.wx)}">${esc(g)}</i>`
     ).join('')}</span></div>`;
   }).join('');
   const colKw = LABELS.map(([k, lab]) => {
@@ -303,7 +313,7 @@ export function renderQimen(f) {
   }).join('');
   const fpStems = ['year', 'month', 'day', 'hour'].map((k) => {
     const g = fp[k]?.gan;
-    return g ? `<b>${esc(g)}</b>` : '—';
+    return g ? `<b style="color:${elColor(GAN_INFO[g]?.wx)}">${esc(g)}</b>` : '—';
   }).join('<span class="sgap">·</span>');
   const szTable = fp.day ? `<div class="sz">
     <div class="k h"></div><div class="h">年柱</div><div class="h">月柱</div><div class="h">日柱</div><div class="h">时柱</div>

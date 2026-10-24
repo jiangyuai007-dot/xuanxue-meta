@@ -91,14 +91,10 @@ const CSS = `
 .ly3 .lrow:has(.lfu-badge) .lzc-core{transform:translateY(-6px)}
 .ly3 .lfu-badge em{font-style:normal;font-weight:700;margin-left:1px}
 .ly3 .ltack{display:flex;align-items:center;justify-content:center;min-width:0}
-/* 爻画：静爻墨黑，动爻鲜明朱砂红 */
+/* 爻画与纳甲干支：统一采用沉稳墨黑（#241f18），仅中间动爻符号 0→ / X→ 标红 */
 .ly3 .yao{width:88px;height:10px;border-radius:2px;background:#241f18;flex:0 0 auto}
 .ly3 .yao.yin{background:transparent;display:flex;justify-content:space-between}
 .ly3 .yao.yin::before,.ly3 .yao.yin::after{content:"";width:42%;height:10px;border-radius:2px;background:#241f18}
-.ly3 .lrow.dong .yao:not(.yin),
-.ly3 .lrow.dong .yao.yin::before,
-.ly3 .lrow.dong .yao.yin::after{background:#c8281d;box-shadow:0 1px 4px rgba(200,40,29,.28)}
-.ly3 .lrow.dong .lzc-core .lz{color:#c8281d}
 /* 中缝 / 世应列 */
 .ly3 .lmc{display:flex;align-items:center;justify-content:center;gap:2px;min-width:0}
 .ly3 .lmk{font-style:normal;font-size:12px;font-weight:800;line-height:1;color:#c8281d;white-space:nowrap}
@@ -227,13 +223,12 @@ export function renderLiuyao(f) {
     ? `${f.yueJian.jieName}${fmtJd(f.yueJian.jieJd)} ~ ${f.yueJian.nextName || ''}${fmtJd(f.yueJian.nextJd)}`
     : '—';
 
-  // 对标热卜六爻：月柱与日柱的天干、地支整柱标红（#c8281d），年柱与时柱墨黑
+  // 四柱干支：天干全部墨黑，唯独【月支（月建）】【日支（日辰）】标红
   const gzCell = (k, label) => {
     const p = siZhu[k];
     if (!p) return `<span><b>—</b></span>`;
-    const isKeyPillar = k === 'month' || k === 'day';
-    const cls = isKeyPillar ? ' class="gz-key"' : '';
-    return `<span><b${cls}>${esc(p.name[0])}</b><b${cls}>${esc(p.zhi)}</b><span>${label}</span></span>`;
+    const isKeyZhi = k === 'month' || k === 'day';
+    return `<span><b>${esc(p.name[0])}</b><b${isKeyZhi ? ' class="gz-key"' : ''}>${esc(p.zhi)}</b><span>${label}</span></span>`;
   };
   const xkCell = (k) => `<span>${esc(siZhu[k]?.xunkong?.join('') || '—')}</span>`;
 

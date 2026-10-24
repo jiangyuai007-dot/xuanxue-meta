@@ -445,7 +445,7 @@ function timeTrack(f) {
       data-six="${esc(JSON.stringify(defRels))}"
       title="${s.fromYear}–${s.toYear} 年　天干${esc(s.shishen)}·支本气${esc(dyZss)}">
       <em>${s.startAge}–${s.startAge + 9}岁</em>
-      <b style="color:${wxOf(s.gan)}">${s.name}</b>
+      <b><span style="color:${wxOf(s.gan)}">${s.gan}</span><span style="color:${wxOf(s.zhi)}">${s.zhi}</span></b>
       <span class="bz-ss-pair">${esc(s.shishen)}</span>
     </label>`;
   }).join('') + '</div>';
@@ -466,13 +466,13 @@ function timeTrack(f) {
         data-ly-year="${y}" data-ly-gz="${esc(gz.name)}" data-ly-ss="${esc(sShi)}·${esc(zShi)}"
         data-six="${esc(JSON.stringify(relsY))}"
         title="${y} 年 ${gz.name}　点击联动六柱同参并展开流月／流日">
-        <em>${y}</em><b>${gz.name}</b><i>${sShi}</i></span>`);
+        <em>${y}</em><b><span style="color:${wxOf(gz.gan)}">${gz.gan}</span><span style="color:${wxOf(gz.zhi)}">${gz.zhi}</span></b><i>${sShi}</i></span>`);
     }
     const impacts = list(s.impact?.all);
     return `<div class="bz-dy-panel bz-dy-p${i}">
       <div class="bz-step-head">
         <span class="bz-step-age">${s.startAge}–${s.startAge + 9} 岁（${s.fromYear}–${s.toYear}）</span>
-        <span class="bz-step-gz" style="color:${wxOf(s.gan)}">${s.name}</span>
+        <span class="bz-step-gz"><span style="color:${wxOf(s.gan)}">${s.gan}</span><span style="color:${wxOf(s.zhi)}">${s.zhi}</span></span>
         <span class="bz-step-ss">${esc(s.shishen)}</span>
         ${impacts.length ? `<span class="bz-step-hit" title="${esc(impacts.map((x) => x.name).join('、'))}">原局互动 ${impacts.length} 项</span>` : ''}
       </div>
@@ -635,8 +635,8 @@ const CSS = `
 .bz-ly em{font-style:normal;font-size:9.5px;color:#8b8172}
 .bz-ly b{font-family:"Noto Serif SC",serif;font-size:13px}
 .bz-ly i{font-style:normal;font-size:9.5px;color:#9a7720}
-.bz-ly.now{background:#2f7d52;border-color:#2f7d52;color:#fff}
-.bz-ly.now em,.bz-ly.now i{color:#d8efe2}
+.bz-ly.now{background:#f5efe0;border:1.5px solid #2f7d52;box-shadow:0 0 0 1px rgba(47,125,82,.15)}
+.bz-ly.now em{color:#2f7d52;font-weight:700}
 .bz-ly.on{border-color:#b0812b;background:#f3e8cf}
 
 .bz-six{background:linear-gradient(180deg,#fffdf9,#faf4e6);border:1px solid #dccba9;border-radius:10px;padding:10px 12px;margin-top:8px}

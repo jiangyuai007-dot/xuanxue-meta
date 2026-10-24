@@ -45,14 +45,14 @@
       if (window.caches && typeof window.caches.keys === 'function') {
         window.caches.keys().then(function (keys) {
           keys.forEach(function (k) {
-            if (k.indexOf('v2.5') === -1) window.caches.delete(k);
+            if (k.indexOf('v2.6') === -1) window.caches.delete(k);
           });
         });
       }
     } catch (e) {}
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/sw.js?v=20261024v25').then(function (reg) {
+        navigator.serviceWorker.register('/sw.js?v=20261024v26').then(function (reg) {
           if (reg && typeof reg.update === 'function') reg.update();
         }).catch(function () {});
       });
