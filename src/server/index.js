@@ -27,8 +27,7 @@ import {
 } from '../commerce/sku.js';
 import { entitledSections } from '../commerce/entitle.js';
 import { listChannels, handleNotify } from '../commerce/pay/index.js';
-import { register as accountRegister, login as accountLogin, verifySession, logout as accountLogout, userStats } from '../account/user.js';
-import { submitFeedback, listFeedbacks, removeFeedback, FEEDBACK_CATEGORIES } from '../account/feedback.js';
+import { register as accountRegister, login as accountLogin, verifySession, logout as accountLogout, userStats, submitFeedback, listFeedbacks, removeFeedback, FEEDBACK_CATEGORIES } from '../account/user.js';
 import { saveReport, listReports, getReport, getReportByPackId, removeReport, touchReport } from '../account/reportstore.js';
 import { storageStats } from '../storage/db.js';
 import { computeAlmanac } from '../core/almanac.js';

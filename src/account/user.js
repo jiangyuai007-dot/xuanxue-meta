@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { getSecret } from '../commerce/entitle.js';
 import { DATA_DIR, readCollection, writeCollection } from '../storage/db.js';
+import { gate } from '../compliance/gateway.js';
 
 const USER_FILE = path.join(DATA_DIR, 'users.json');
 
@@ -159,4 +160,102 @@ export function getUserById(id) {
 export function userStats() {
   const list = loadUsers();
   return { total: list.length, locked: list.filter((u) => u.lockedUntil && Date.now() < u.lockedUntil).length, file: USER_FILE };
+}
+
+
+// ------------------------------------------------------------------
+// 用户意见反馈（直接内聚于 user.js，防止 git commit -a 漏掉新建未跟踪文件导致启动报错）
+// ------------------------------------------------------------------
+
+export const FEEDBACK_CATEGORIES = [
+  { key: 'algorithm', label: '排盘与历法建议' },
+  { key: 'ui_ux', label: '界面与手机适配' },
+  { key: 'feature', label: '新功能许愿' },
+  { key: 'bug', label: '异常与 Bug 报错' },
+  { key: 'other', label: '其它建议' },
+];
+
+const VALID_FBK_CATS = new Set(FEEDBACK_CATEGORIES.map((c) => c.key));
+const FBK_CAT_LABEL = Object.fromEntries(FEEDBACK_CATEGORIES.map((c) => [c.key, c.label]));
+
+export function submitFeedback({
+  owner = '',
+  userEmail = '',
+  userNickname = '',
+  category = 'ui_ux',
+  system = 'general',
+  rating = 5,
+  content = '',
+  contact = '',
+  pageUrl = '',
+} = {}) {
+  const rawContent = String(content || '').trim();
+  if (rawContent.length < 4) {
+    throw new Error('请填写至少 4 个字的具体反馈内容，以便我们改进');
+  }
+  if (rawContent.length > 1000) {
+    throw new Error('单条反馈请控制在 1000 字以内');
+  }
+
+  const cat = VALID_FBK_CATS.has(category) ? category : 'other';
+  const sys = ['bazi', 'liuyao', 'qimen', 'ziwei', 'hepan', 'mine', 'general'].includes(system)
+    ? system
+    : 'general';
+  const stars = Math.max(1, Math.min(5, Math.round(Number(rating) || 5)));
+  const cleanContact = String(contact || '').trim().slice(0, 80);
+  const safeContent = gate(rawContent, { system: 'general', section: 'feedback' }).text;
+
+  const now = new Date().toISOString();
+  const id = 'FB' + crypto.randomBytes(5).toString('hex').toUpperCase();
+
+  const autoReplyMap = {
+    algorithm: '已收录至「玄机历算与排盘内核组」工单池，我们将核对古籍口径与万年历真值后在后续版本校准。',
+    ui_ux: '已收录至「双端视觉与适老化体验组」工单池，我们会持续优化手机端与桌面端的排版可读性。',
+    feature: '感谢您的功能许愿！已纳入玄机产品迭代路线图评估队列。',
+    bug: '已触发高优异常排查工单，工程团队将根据您所在页面的上下文复现并热修。',
+    other: '感谢您的宝贵建议！您的每一条反馈都是玄机持续打磨产品品质的动力。',
+  };
+
+  const item = {
+    id,
+    owner: String(owner || 'anonymous'),
+    userEmail: String(userEmail || ''),
+    userNickname: String(userNickname || ''),
+    category: cat,
+    categoryLabel: FBK_CAT_LABEL[cat] || '其它建议',
+    system: sys,
+    rating: stars,
+    content: safeContent,
+    contact: cleanContact,
+    pageUrl: String(pageUrl || '').slice(0, 120),
+    status: '已受理',
+    reply: autoReplyMap[cat] || autoReplyMap.other,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const list = readCollection('feedbacks');
+  list.unshift(item);
+  if (list.length > 500) list.length = 500;
+  writeCollection('feedbacks', list);
+  return item;
+}
+
+export function listFeedbacks(owner, { limit = 30 } = {}) {
+  const list = readCollection('feedbacks');
+  if (!owner) return list.slice(0, limit);
+  return list
+    .filter((x) => x && x.owner === owner)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    .slice(0, limit);
+}
+
+export function removeFeedback(id, owner) {
+  if (!id || !owner) return false;
+  const list = readCollection('feedbacks');
+  const target = list.find((x) => x && x.id === id);
+  if (!target || target.owner !== owner) return false;
+  const next = list.filter((x) => x && x.id !== id);
+  writeCollection('feedbacks', next, { deletedIds: [id] });
+  return true;
 }
