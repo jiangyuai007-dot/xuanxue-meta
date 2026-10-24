@@ -1,14 +1,15 @@
 /**
- * 玄机 PWA Service Worker（web/sw.js）
+ * 玄机 PWA Service Worker（web/sw.js · v2.3 Network-First 防旧缓存锁死版）
  *
  * 策略：
- *   1. 核心静态骨架（HTML / CSS / JS / 子集字体 / 图标）预缓存 + Stale-While-Revalidate，秒开无白屏；
- *   2. /api/cities 与 /api/report/css 支持离线缓存回退；
+ *   1. 静态资源（HTML / CSS / JS）一律采用 Network-First（网络优先，实时拉取最新样式与脚本，仅断网时回退离线缓存），
+ *      彻底杜绝版本更新后手机端被旧版 CSS/JS 缓存锁死的问题；
+ *   2. 激活时自动清理所有旧版缓存（v2.0 / v2.1 / v2.2）；
  *   3. POST /api/paipan 与 /api/hepan 采用 Network-First + 请求体摘要缓存，断网时可重放已排过的命盘。
  */
 
-const CACHE_STATIC = 'xuanji-static-v2.0';
-const CACHE_API = 'xuanji-api-v2.0';
+const CACHE_STATIC = 'xuanji-static-v2.3';
+const CACHE_API = 'xuanji-api-v2.3';
 
 const PRECACHE_URLS = [
   '/bazi.html',
@@ -17,24 +18,24 @@ const PRECACHE_URLS = [
   '/ziwei.html',
   '/hepan.html',
   '/mine.html',
-  '/style.css',
+  '/style.css?v=20261024a',
   '/fonts/subset.css',
-  '/app.js',
-  '/bazi-drill.js',
-  '/hepan-drill.js',
-  '/cloud-history.js',
-  '/mine.js',
-  '/poster.js',
+  '/app.js?v=20261024a',
+  '/bazi-drill.js?v=20261024a',
+  '/hepan-drill.js?v=20261024a',
+  '/cloud-history.js?v=20261024a',
+  '/mine.js?v=20261024a',
+  '/poster.js?v=20261024a',
   '/icon.svg',
   '/manifest.json',
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches
       .open(CACHE_STATIC)
       .then((cache) => cache.addAll(PRECACHE_URLS).catch(() => {}))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -67,7 +68,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // 1) POST /api/paipan 或 /api/hepan：网络优先，成功后按 body 哈希写入离线缓存，断网时回退缓存
+  // 1) POST /api/paipan 或 /api/hepan：网络优先，断网回退缓存
   if (req.method === 'POST' && (url.pathname === '/api/paipan' || url.pathname === '/api/hepan')) {
     event.respondWith(
       (async () => {
@@ -86,7 +87,7 @@ self.addEventListener('fetch', (event) => {
             cache.put(keyUrl, netRes.clone()).catch(() => {});
           }
           return netRes;
-        } catch (err) {
+        } catch {
           const cache = await caches.open(CACHE_API);
           const hit = await cache.match(keyUrl);
           if (hit) return hit;
@@ -121,22 +122,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 其余 /api/* 请求直接走网络
   if (url.pathname.startsWith('/api/')) return;
 
-  // 3) 静态资源：Stale-While-Revalidate（优先返回缓存并后台更新，保证切换页面无白屏）
+  // 3) 静态资源（HTML/CSS/JS）：严格 Network-First（网络优先，杜绝旧缓存锁死 UI），断网时回退缓存
   event.respondWith(
-    caches.open(CACHE_STATIC).then(async (cache) => {
-      const cached = await cache.match(req, { ignoreSearch: true });
-      const fetchPromise = fetch(req)
-        .then((netRes) => {
-          if (netRes && netRes.ok) {
-            cache.put(req, netRes.clone()).catch(() => {});
-          }
-          return netRes;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    })
+    fetch(req, { cache: 'no-cache' })
+      .then(async (netRes) => {
+        if (netRes && netRes.ok) {
+          const cache = await caches.open(CACHE_STATIC);
+          cache.put(req, netRes.clone()).catch(() => {});
+        }
+        return netRes;
+      })
+      .catch(async () => {
+        const cache = await caches.open(CACHE_STATIC);
+        return (await cache.match(req)) || (await cache.match(req, { ignoreSearch: true })) || new Response('Offline', { status: 503 });
+      })
   );
 });

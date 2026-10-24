@@ -99,7 +99,7 @@ function canonical(input) {
     'type', 'calendar', 'year', 'month', 'day', 'hour', 'minute', 'gender',
     'isLeapMonth', 'city', 'lon', 'lat', 'useTrueSolarTime', 'tzOffset',
     'method', 'numbers', 'lines', 'guaName', 'category', 'purpose', 'question',
-    'panType', 'jiGong', 'juMethod', 'customJu',
+    'panType', 'jiGong', 'juMethod', 'customJu', 'customYinYang',
   ];
   const o = {};
   for (const k of keys) {

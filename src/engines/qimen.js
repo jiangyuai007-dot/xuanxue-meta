@@ -172,12 +172,17 @@ export function computeQimen(input) {
 
   // 阴阳遁与局数
   const ti = effectiveTermIdx;
-  const isYang = !(ti >= 11 && ti <= 22);
+  let isYang = !(ti >= 11 && ti <= 22);
   const juTable = JU_TABLE[ti] || [1, 7, 4];
   let ju = juTable[yuanIdx];
-  if (juMethod === 'custom' && Number(input.customJu) >= 1 && Number(input.customJu) <= 9) {
-    ju = Math.floor(Number(input.customJu));
-    yuanBasis = `自选局数：${ju} 局（三元按拆补推）`;
+  if (juMethod === 'custom') {
+    const rawJu = Number(input.customJu);
+    if (Number.isFinite(rawJu) && Math.abs(rawJu) >= 1 && Math.abs(rawJu) <= 9) {
+      ju = Math.floor(Math.abs(rawJu));
+    }
+    if (input.customYinYang === 'yin' || rawJu < 0) isYang = false;
+    else if (input.customYinYang === 'yang' || rawJu > 0) isYang = true;
+    yuanBasis = `自选局数：${isYang ? '阳遁' : '阴遁'}${ju}局`;
   }
   const forward = isYang;
   const isFeiPan = input.panType === 'fei';

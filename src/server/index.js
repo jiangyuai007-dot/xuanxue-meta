@@ -198,6 +198,9 @@ function serveStatic(req, res, urlPath) {
   if (isSw) {
     cacheControl = 'no-cache, must-revalidate';
     extra['Service-Worker-Allowed'] = '/';
+  } else if (ext === '.css' || ext === '.js') {
+    cacheControl = 'no-cache, must-revalidate';
+    extra['ETag'] = '"' + crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16) + '"';
   } else if (ext !== '.html') {
     cacheControl = 'public, max-age=300';
     extra['ETag'] = '"' + crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16) + '"';

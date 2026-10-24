@@ -246,7 +246,7 @@ function syncMethodUi() {
     number2: '前两数定上下卦，第三数参入派生动爻（可多爻齐动）',
     coin: '点击铜钱摇出一爻，共摇六次（由下而上）；每爻三枚铜钱定阴阳动静',
     manual: '直接指定六爻的阴阳，装卦成静卦',
-    name: '直接从六十四卦中选定一卦，作为静卦装卦',
+    name: '由上卦（外卦）+ 下卦（内卦）八纯卦叠加成卦；勾选「选变卦」可继续指定变卦上下卦',
     auto: '由系统随机摇出六爻（等同铜钱法）',
   };
   if ($('methodTip')) $('methodTip').textContent = tips[m] || '';
@@ -367,10 +367,47 @@ const GUA64 = [
   '山天大畜', '山泽损', '山火贲', '山雷颐', '山风蛊', '山水蒙', '艮为山', '山地剥',
   '地天泰', '地泽临', '地火明夷', '地雷复', '地风升', '地水师', '地山谦', '坤为地',
 ];
+const GUA_BY_TRIGRAM = {
+  乾: { 乾: "乾为天", 兑: "天泽履", 离: "天火同人", 震: "天雷无妄", 巽: "天风姤", 坎: "天水讼", 艮: "天山遁", 坤: "天地否" },
+  兑: { 乾: "泽天夬", 兑: "兑为泽", 离: "泽火革", 震: "泽雷随", 巽: "泽风大过", 坎: "泽水困", 艮: "泽山咸", 坤: "泽地萃" },
+  离: { 乾: "火天大有", 兑: "火泽睽", 离: "离为火", 震: "火雷噬嗑", 巽: "火风鼎", 坎: "火水未济", 艮: "火山旅", 坤: "火地晋" },
+  震: { 乾: "雷天大壮", 兑: "雷泽归妹", 离: "雷火丰", 震: "震为雷", 巽: "雷风恒", 坎: "雷水解", 艮: "雷山小过", 坤: "雷地豫" },
+  巽: { 乾: "风天小畜", 兑: "风泽中孚", 离: "风火家人", 震: "风雷益", 巽: "巽为风", 坎: "风水涣", 艮: "风山渐", 坤: "风地观" },
+  坎: { 乾: "水天需", 兑: "水泽节", 离: "水火既济", 震: "水雷屯", 巽: "水风井", 坎: "坎为水", 艮: "水山蹇", 坤: "水地比" },
+  艮: { 乾: "山天大畜", 兑: "山泽损", 离: "山火贲", 震: "山雷颐", 巽: "山风蛊", 坎: "山水蒙", 艮: "艮为山", 坤: "山地剥" },
+  坤: { 乾: "地天泰", 兑: "地泽临", 离: "地火明夷", 震: "地雷复", 巽: "地风升", 坎: "地水师", 艮: "地山谦", 坤: "坤为地" },
+};
+function syncTrigramGuaUi() {
+  const bUp = $("benUp") ? $("benUp").value : "乾";
+  const bLow = $("benLow") ? $("benLow").value : "乾";
+  const benName = (GUA_BY_TRIGRAM[bUp] && GUA_BY_TRIGRAM[bUp][bLow]) || "乾为天";
+  if ($("benGuaPreview")) $("benGuaPreview").textContent = "→ " + benName;
+  if ($("guaName")) $("guaName").value = benName;
+  const hasBian = $("hasBianGua") ? $("hasBianGua").checked : false;
+  if ($("bianGuaGroup")) $("bianGuaGroup").style.display = hasBian ? "inline-flex" : "none";
+  const yUp = $("bianUp") ? $("bianUp").value : bUp;
+  const yLow = $("bianLow") ? $("bianLow").value : bLow;
+  const bianName = hasBian ? ((GUA_BY_TRIGRAM[yUp] && GUA_BY_TRIGRAM[yUp][yLow]) || benName) : benName;
+  if ($("bianGuaPreview")) $("bianGuaPreview").textContent = "→ " + bianName;
+  if ($("bianGuaName")) $("bianGuaName").value = bianName;
+}
 function buildGuaNameSelect() {
-  if (!$('guaName')) return;
-  $('guaName').innerHTML = GUA64.map((n) => `<option value="${n}">${n}</option>`).join('');
-  $('guaName').dataset.built = '1';
+  if ($("guaName") && !$("guaName").dataset.built) {
+    $("guaName").innerHTML = GUA64.map((n) => `<option value="${n}">${n}</option>`).join("");
+    $("guaName").dataset.built = "1";
+  }
+  if ($("bianGuaName") && !$("bianGuaName").dataset.built) {
+    $("bianGuaName").innerHTML = GUA64.map((n) => `<option value="${n}">${n}</option>`).join("");
+    $("bianGuaName").dataset.built = "1";
+  }
+  ["benUp", "benLow", "hasBianGua", "bianUp", "bianLow"].forEach((id) => {
+    const el = $(id);
+    if (el && !el.dataset.bound) {
+      el.dataset.bound = "1";
+      el.addEventListener("change", syncTrigramGuaUi);
+    }
+  });
+  syncTrigramGuaUi();
 }
 
 function resetResult() {
@@ -477,15 +514,16 @@ function collectInput() {
       base.lines = lines;
     } else if (base.method === 'manual') base.lines = manualState.slice();
     else if (base.method === 'name') {
+      syncTrigramGuaUi();
       base.guaName = val('guaName', '乾为天');
-      base.bianGuaName = val('bianGuaName', '') || base.guaName;
+      base.bianGuaName = ($('hasBianGua') && $('hasBianGua').checked) ? (val('bianGuaName', '') || base.guaName) : base.guaName;
     }
   } else if (CURRENT_SYS === 'qimen') {
     base.purpose = val('purpose', 'general');
     base.panType = val('panType', 'zhuan');
     base.jiGong = val('jiGong', 'kun2');
     base.juMethod = val('juMethod', 'chaibu');
-    if (base.juMethod === 'custom') base.customJu = Number(val('customJu', 1));
+    if (base.juMethod === 'custom') { base.customJu = Number(val('customJu', 1)); base.customYinYang = val('customYinYang', 'yang'); }
     base.useTrueSolarTime = $('useSolar') ? $('useSolar').checked : true;
   }
   return base;
@@ -1099,7 +1137,7 @@ function init() {
   if ((CURRENT_SYS === 'liuyao' || CURRENT_SYS === 'qimen') && $('year')) setNow();
   if ($('juMethod')) {
     $('juMethod').addEventListener('change', () => {
-      if ($('customJuWrap')) $('customJuWrap').style.display = $('juMethod').value === 'custom' ? '' : 'none';
+      if ($('customJuWrap')) $('customJuWrap').style.display = $('juMethod').value === 'custom' ? 'inline-flex' : 'none';
     });
   }
   syncMethodUi();

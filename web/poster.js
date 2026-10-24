@@ -23,7 +23,7 @@
   };
 
   var NAV_ITEMS = [
-    { sys: 'bazi', href: 'bazi.html', ic: '☯', label: '八字' },
+    { sys: 'bazi', href: 'bazi.html', ic: '<svg viewBox="0 0 24 24" width="16" height="16" style="display:inline-block;vertical-align:-2px" aria-hidden="true"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path fill="currentColor" fill-rule="evenodd" d="M12 2.8A4.6 4.6 0 0 1 12 12a4.6 4.6 0 0 0 0 9.2 9.2 9.2 0 0 1 0-18.4Zm0 3.1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/><circle cx="12" cy="16.6" r="1.5" fill="currentColor"/></svg>', label: '八字' },
     { sys: 'liuyao', href: 'liuyao.html', ic: '䷀', label: '六爻' },
     { sys: 'qimen', href: 'qimen.html', ic: '☷', label: '奇门' },
     { sys: 'ziwei', href: 'ziwei.html', ic: '✦', label: '紫微' },
@@ -41,9 +41,20 @@
 
   // 1) 注册 PWA Service Worker
   function registerPwa() {
+    try {
+      if (window.caches && typeof window.caches.keys === 'function') {
+        window.caches.keys().then(function (keys) {
+          keys.forEach(function (k) {
+            if (k.indexOf('v2.4') === -1) window.caches.delete(k);
+          });
+        });
+      }
+    } catch (e) {}
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/sw.js').catch(function () {});
+        navigator.serviceWorker.register('/sw.js?v=20261024v24').then(function (reg) {
+          if (reg && typeof reg.update === 'function') reg.update();
+        }).catch(function () {});
       });
     }
   }
@@ -167,11 +178,17 @@
       if (text) text.textContent = opts.summary || '';
       bar.style.display = 'flex';
       var expBtn = document.getElementById('btnExpandForm');
+      var isMobile = window.innerWidth <= 820;
       if (window.__xjAutoPreviewing) {
         window.__xjAutoPreviewing = false;
-        if (badge) badge.textContent = '实时命盘预览';
-        formbar.classList.remove('is-collapsed');
-        if (expBtn) expBtn.textContent = '收起表单';
+        if (badge) badge.textContent = '已排盘';
+        if (isMobile) {
+          formbar.classList.add('is-collapsed');
+          if (expBtn) expBtn.textContent = '展开修改';
+        } else {
+          formbar.classList.remove('is-collapsed');
+          if (expBtn) expBtn.textContent = '收起表单';
+        }
       } else {
         formbar.classList.add('is-collapsed');
         if (expBtn) expBtn.textContent = '展开修改';
@@ -964,7 +981,7 @@
 
     var cfgMap = {
       bazi: {
-        seal: '☯ 八字真太阳时起盘台',
+        seal: '☯\uFE0E 八字真太阳时起盘台',
         meta: '节气交脱分秒定局 · 110项古籍神煞 · 六柱岁运同参',
         chips: [
           { act: 'now', label: '⚡ 此刻起盘' },
@@ -1155,7 +1172,6 @@
     ensureQuickCastBar();
     ensureStageViewTabs();
     ensureFollowupBox();
-    autoPreviewInitialChart();
   }
 
   if (document.readyState === 'loading') {
