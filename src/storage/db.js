@@ -26,6 +26,7 @@ const FILES = {
   orders: path.join(DATA_DIR, 'orders.json'),
   reports: path.join(DATA_DIR, 'reports.json'),
   chats: path.join(DATA_DIR, 'chats.json'),
+  feedbacks: path.join(DATA_DIR, 'feedbacks.json'),
 };
 
 function ensureDataDir() {
@@ -72,6 +73,7 @@ const lastFileStat = {
   orders: -1,
   reports: -1,
   chats: -1,
+  feedbacks: -1,
 };
 
 function readJsonFileRaw(collection) {

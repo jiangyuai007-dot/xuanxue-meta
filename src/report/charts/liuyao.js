@@ -1,18 +1,12 @@
 /**
- * 六爻卦象 —— 热卜（移动端）版式 · 专业实测精修版
+ * 六爻卦象 —— 热卜（移动端）版式 · 专业实测精修版 v2.5
  *
  * 结构（自上而下）：
- *  ① 占断信息表  事项/日期/卦式/节气/干支四柱（唯独月支、日支标红，其余全黑）/空亡
- *  ② 神煞区      以日辰/月建/年君为锚的全部神煞（落卦者标注爻位）
- *  ③ 卦象区      热卜式八列，本卦与变卦同一行左右并排（两卦共用一套列定义，天然对齐）：
- *               左四列（本卦）六兽｜六亲｜纳甲（天干小字 + 地支大字，绝对居中对齐，伏神悬浮不挤占位置）｜爻画
- *               中缝（动爻 0→ / X→；静爻位标 世 / 应）
- *               右四列（变卦）爻画｜纳甲｜六亲
- *
- * 核心优化：
- *  1. 四柱干支：六爻以「月建（月支）」「日辰（日支）」为纲领，故四柱全部用墨黑，唯独【月支】【日支】用朱砂红醒目高亮；
- *  2. 动爻高亮：动爻爻画（阳动/阴动）统一采用鲜明朱砂红（#c8281d），一眼识别动变之爻；
- *  3. 伏神零挤压：纳甲地支列采用中心锚定 + 伏神绝对定位（桌面端贴于地支右侧、手机端贴于地支正下），六爻干支在垂直方向 100% 严丝合缝对齐，绝不因伏神出现而挤歪位置。
+ *  ① 占断信息表  事项/日期/卦式/节气/干支四柱（对标热卜：月柱、日柱天干地支整柱标红，年时柱墨黑）/空亡
+ *  ② 神煞区      热卜式严格 4 列对齐网格（名称--地支，合并贵人、剔除杂乱后缀）+ 右上角「收起/展开」开关
+ *  ③ 卦象区      智能区分【静卦】与【动变之卦】：
+ *               - 静卦（无动爻且本变同卦）：对标热卜，居中仅展示单一本卦（五列：六兽｜六亲｜纳甲｜爻画｜世应），绝不重复渲染两个相同卦！
+ *               - 动变卦（有动爻或指定变卦）：热卜式八列左右并排（本卦 + 变卦），动爻朱砂红醒目高亮。
  */
 
 import { esc, list } from './shared.js';
@@ -20,159 +14,138 @@ import { jdnToYmd } from '../../core/julian.js';
 import { guaciOf } from '../../core/guaci.js';
 
 /** 六神单字 */
-const SHEN_CHAR = { 青龙: '龙', 朱雀: '朱', 勾陈: '勾', 螣蛇: '蛇', 白虎: '虎', 玄武: '玄' };
+const SHEN_CHAR = { 青龙: '龙', 朱雀: '雀', 勾陈: '勾', 螣蛇: '蛇', 白虎: '虎', 玄武: '玄' };
 
 const METHOD_NAME = {
-  time: '时间起卦', number: '数字起卦', number2: '数字起卦（三数）',
-  coin: '摇卦（铜钱）', manual: '手动指定', name: '卦名起卦', auto: '自动起卦',
+  time: '时间起卦', number: '两数起卦', number2: '三数起卦',
+  coin: '在线摇卦', manual: '手动指定', name: '卦名起卦', auto: '自动起卦',
 };
 
 const CSS = `
 .ly3{--ink:#241f18;--sub:#8b8172;--gold:#b0812b;--line:#e7ddc9;--red:#c8281d;
-  /* 卦象行八列：本卦(六兽·六亲·纳甲·爻画) | 中缝 | 变卦(爻画·纳甲·六亲)，本/变共用一套列定义故天然对齐 */
-  --ly8:26px 46px minmax(92px,1.25fr) minmax(84px,1.55fr) 54px minmax(84px,1.55fr) minmax(68px,1fr) 44px;
+  --ly8:26px 46px minmax(82px,1.2fr) minmax(80px,1.5fr) 48px minmax(80px,1.5fr) minmax(68px,1fr) 44px;
+  --ly5:28px 50px 86px 104px 36px;
   max-width:860px;margin:0 auto;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",sans-serif;font-size:13px}
 .ly3 *{box-sizing:border-box}
 .ly3 .sheet{background:linear-gradient(180deg,#fffdf8,#fbf7ee);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 10px 26px -18px rgba(80,60,30,.4)}
 /* —— 信息表 —— */
-.ly3 .iro{display:grid;grid-template-columns:74px 1fr;border-bottom:1px solid #efe8d8}
+.ly3 .iro{display:grid;grid-template-columns:68px 1fr;border-bottom:1px solid #efe8d8}
 .ly3 .iro:last-of-type{border-bottom:0}
-.ly3 .ik{display:flex;align-items:center;justify-content:center;padding:9px 4px;font-size:13px;color:var(--gold);background:#fbf6ea;border-right:1px solid #efe8d8;letter-spacing:2px}
-.ly3 .iv{padding:9px 12px;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.ly3 .ik{display:flex;align-items:center;justify-content:center;padding:8px 4px;font-size:13px;color:var(--gold);background:#fbf6ea;border-right:1px solid #efe8d8;letter-spacing:2px}
+.ly3 .iv{padding:8px 12px;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .ly3 .iv.center{justify-content:center}
-.ly3 .gz4{display:grid;grid-template-columns:repeat(4,1fr);width:100%;gap:4px}
-.ly3 .gz4 span{display:flex;flex-direction:column;align-items:center;gap:0}
-.ly3 .gz4 b{font-family:"Noto Serif SC",serif;font-size:21px;line-height:1.25;text-align:center;letter-spacing:1px;font-weight:800;color:#241f18}
+.ly3 .gz4{display:grid;grid-template-columns:repeat(4,1fr);width:100%;gap:0}
+.ly3 .gz4>span{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 0;border-right:1px solid #f0e8d6}
+.ly3 .gz4>span:last-child{border-right:0}
+.ly3 .gz4 b{font-family:"Noto Serif SC",serif;font-size:20px;line-height:1.22;text-align:center;letter-spacing:1px;font-weight:800;color:#241f18}
 .ly3 .gz4 b.gz-key{color:#c8281d}
 .ly3 .gz4 span>span{display:block;text-align:center;font-size:11px;color:var(--sub);margin-top:2px}
-.ly3 .xk4{display:grid;grid-template-columns:repeat(4,1fr);width:100%;gap:4px}
-.ly3 .xk4 span{text-align:center;font-size:12.5px;color:#9b8f77;letter-spacing:2px}
+.ly3 .xk4{display:grid;grid-template-columns:repeat(4,1fr);width:100%;gap:0}
+.ly3 .xk4 span{text-align:center;font-size:12.5px;color:#8a7e68;letter-spacing:2px;border-right:1px solid #f0e8d6}
+.ly3 .xk4 span:last-child{border-right:0}
 .ly3 .q{font-weight:600;color:#4a4032}
-/* —— 神煞 —— */
-.ly3 .ss-grid{display:flex;flex-wrap:wrap;gap:4px 12px}
-.ly3 .ss-item{font-size:12px;color:#6d6353;white-space:nowrap}
-.ly3 .ss-item b{color:#4a4032;font-weight:600}
-.ly3 .ss-item i{font-style:normal;color:#a89c85;font-size:11px;margin-left:1px}
-.ly3 .ss-item.in{outline:none}
-.ly3 .ss-item.in b{color:#b0812b}
-.ly3 .ss-note{font-size:11px;color:#b3a98f;margin-top:2px}
-/* —— 卦象：热卜式八列，本卦与变卦同一行左右并排、共用一条基线 —— */
-.ly3 .wrap{display:flex;flex-direction:column;padding:10px 6px}
+/* —— 神煞（热卜式 4 列严整网格 + 收起/展开） —— */
+.ly3 .ss-wrap{width:100%}
+.ly3 .ss-head-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.ly3 .ss-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 8px;width:100%;align-items:center}
+.ly3 .ss-wrap.is-folded .ss-grid .ss-item:nth-child(n+5){display:none}
+.ly3 .ss-item{font-size:13px;color:#241f18;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}
+.ly3 .ss-item b{color:#241f18;font-weight:500}
+.ly3 .ss-item.in b{color:#241f18}
+.ly3 .ss-toggle{border:none;background:transparent;color:#1f7a68;font-size:12px;font-weight:600;cursor:pointer;padding:0 2px;margin-left:auto}
+.ly3 .ss-toggle:hover{text-decoration:underline}
+/* —— 卦象区 —— */
+.ly3 .wrap{display:flex;flex-direction:column;padding:12px 8px}
 .ly3 .lrows{display:flex;flex-direction:column;gap:2px}
-/* 表头：卦名各占一半、各自居中 */
+/* 双卦表头 */
 .ly3 .ghd{display:grid;grid-template-columns:var(--ly8);align-items:end;height:34px;
-  padding-bottom:5px;margin-bottom:4px;border-bottom:1px solid var(--line)}
-.ly3 .ghd .gt{font-family:"Noto Serif SC",serif;font-size:18px;font-weight:700;letter-spacing:1px;
-  color:#2c2418;text-align:center;white-space:nowrap;overflow:hidden}
-.ly3 .ghd .gt i{font-style:normal;font-family:inherit;font-size:11px;font-weight:400;letter-spacing:0;color:var(--sub);margin-left:3px}
+  padding-bottom:6px;margin-bottom:4px;border-bottom:1px solid var(--line)}
+.ly3 .ghd .gt{font-family:"Noto Serif SC",serif;font-size:17.5px;font-weight:700;letter-spacing:1px;
+  color:#241f18;text-align:center;white-space:nowrap;overflow:hidden}
+.ly3 .ghd .gt i{font-style:normal;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0;color:#1f7a68;margin-left:3px}
 .ly3 .ghd .gt.b{grid-column:1/5}
 .ly3 .ghd .gt.y{grid-column:5/9}
-/* 行：行高恒定 46px，任何内容不改行高 */
+/* 静卦（单卦居中表头与五列居中行，对标热卜） */
+.ly3 .ghd.single{display:flex;justify-content:center;align-items:center;height:36px}
+.ly3 .ghd.single .gt.single{font-size:18.5px}
+.ly3 .lrows.single{max-width:350px;width:100%;margin:0 auto}
 .ly3 .lrow{display:grid;grid-template-columns:var(--ly8);align-items:center;height:46px;min-width:0;border-radius:6px}
+.ly3 .lrow.single{grid-template-columns:var(--ly5);justify-content:center}
 .ly3 .lrow.shi{background:#fdf6e8}
 .ly3 .lrow.ying{background:#f2f4f8}
 .ly3 .lrow.dong{background:#fdf0ec}
 /* 六兽：朱红单字 */
-.ly3 .ls{font-size:14px;font-weight:700;text-align:center;color:#b3392b}
-/* 六亲：墨色；身 / 破 / 空 作六亲右侧极小角标 */
-.ly3 .lq{font-size:13px;font-weight:600;text-align:center;color:#2b2721;white-space:nowrap;min-width:0}
+.ly3 .ls{font-size:14px;font-weight:700;text-align:center;color:#b83222}
+/* 六亲：墨色 */
+.ly3 .lq{font-size:13.5px;font-weight:600;text-align:center;color:#241f18;white-space:nowrap;min-width:0}
 .ly3 .lq i{font-style:normal;font-size:9px;font-weight:600;margin-left:1px;padding:0 2px;border-radius:3px;line-height:1.35;vertical-align:1px}
 .ly3 .lq i.kk{background:#eee7d8;color:#8b8172}
 .ly3 .lq i.po{background:#f6ded9;color:#b3604f}
 .ly3 .lq i.bd{background:#ece4f1;color:#7a5ba0}
-/* 纳甲：天干+地支固定居中锚点，伏神使用 absolute 贴附，绝不把干支挤歪！ */
+/* 纳甲：天干+地支固定居中锚点，伏神贴于正下方不挤歪干支 */
 .ly3 .lzc{position:relative;display:flex;align-items:center;justify-content:center;height:100%;min-width:0}
 .ly3 .lzc-core{display:inline-flex;align-items:baseline;justify-content:center;gap:2px}
-.ly3 .lgan{font-size:10px;color:#8d8169;line-height:1;flex:0 0 auto}
+.ly3 .lgan{font-size:11px;color:#7a6f5d;line-height:1;flex:0 0 auto}
 .ly3 .lz{font-family:"Noto Serif SC",serif;font-size:15.5px;font-weight:700;color:#241f18;line-height:1;white-space:nowrap;flex:0 0 auto}
-.ly3 .lfu{display:none}
-/* 伏神：绝对定位于纳甲下方/侧翼，零宽度占用，保证六爻干支垂直方向 100% 笔直对齐 */
-.ly3 .lfu-badge{position:absolute;left:50%;bottom:1px;transform:translateX(-50%);font-style:normal;display:inline-block;font-size:8.5px;font-weight:700;line-height:1.1;color:#fff;background:linear-gradient(180deg,#c69c4e,#a87d22);padding:1px 4px;border-radius:3px;pointer-events:auto;white-space:nowrap;cursor:help;box-shadow:0 1px 2px rgba(120,90,30,.24);letter-spacing:.3px}
-.ly3 .lrow:has(.lfu-badge) .lzc-core{transform:translateY(-5px)}
-.ly3 .lfu-badge em{font-style:normal;font-weight:700;opacity:.95;margin-left:1px}
+.ly3 .lfu-badge{position:absolute;left:50%;bottom:1px;transform:translateX(-50%);font-style:normal;display:inline-block;font-size:9px;font-weight:600;line-height:1.1;color:#b83222;background:#fcedea;border:1px solid #f0c9c2;padding:0.5px 4px;border-radius:3px;pointer-events:auto;white-space:nowrap;cursor:help}
+.ly3 .lrow:has(.lfu-badge) .lzc-core{transform:translateY(-6px)}
+.ly3 .lfu-badge em{font-style:normal;font-weight:700;margin-left:1px}
 .ly3 .ltack{display:flex;align-items:center;justify-content:center;min-width:0}
-/* 爻画：静爻墨黑，动爻（.lrow.dong）鲜明朱砂红（#c8281d），一眼识别动爻！ */
-.ly3 .yao{width:88px;height:10px;border-radius:3px;background:#241f18;flex:0 0 auto;transition:background .15s}
+/* 爻画：静爻墨黑，动爻鲜明朱砂红 */
+.ly3 .yao{width:88px;height:10px;border-radius:2px;background:#241f18;flex:0 0 auto}
 .ly3 .yao.yin{background:transparent;display:flex;justify-content:space-between}
-.ly3 .yao.yin::before,.ly3 .yao.yin::after{content:"";width:41%;height:10px;border-radius:3px;background:#241f18}
+.ly3 .yao.yin::before,.ly3 .yao.yin::after{content:"";width:42%;height:10px;border-radius:2px;background:#241f18}
 .ly3 .lrow.dong .yao:not(.yin),
 .ly3 .lrow.dong .yao.yin::before,
 .ly3 .lrow.dong .yao.yin::after{background:#c8281d;box-shadow:0 1px 4px rgba(200,40,29,.28)}
 .ly3 .lrow.dong .lzc-core .lz{color:#c8281d}
-/* 中缝：动爻 0→ / X→（朱红），静爻位标 世 / 应（金底小方块） */
+/* 中缝 / 世应列 */
 .ly3 .lmc{display:flex;align-items:center;justify-content:center;gap:2px;min-width:0}
 .ly3 .lmk{font-style:normal;font-size:12px;font-weight:800;line-height:1;color:#c8281d;white-space:nowrap}
-.ly3 .ltag{font-style:normal;font-size:9.5px;line-height:1.5;padding:0 3px;border-radius:3px;white-space:nowrap;
-  color:#8a6b16;background:#f7edd6;border:1px solid #e2d3ae}
-.ly3 .ltag.kk{color:#8b8172;background:#eee7d8;border-color:#e2dcd0}
-.ly3 .ltag.po{color:#b3604f;background:#f6ded9;border-color:#edd6d0}
-.ly3 .ltag.bd{color:#7a5ba0;background:#ece4f1;border-color:#dcd2e6}
+.ly3 .ltag{font-style:normal;font-size:11px;font-weight:700;line-height:1.4;padding:0 4px;border-radius:3px;white-space:nowrap;
+  color:#241f18;background:#f3ead6;border:1px solid #dfd1b4}
 /* —— 底部注记 —— */
 .ly3 .props{margin:0 12px 12px;padding:9px 12px;background:#fffdf8;border:1px solid var(--line);border-radius:11px}
-.ly3 .prow{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:#6d6353;line-height:1.9}
+.ly3 .prow{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:#6d6353;line-height:1.8}
 .ly3 .prow .k{color:#a2977f}
 .ly3 .prow b{color:#3b332a;font-weight:600}
-.ly3 .legend{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding:0 12px 10px;font-size:11px;color:#a2977f}
-.ly3 .legend em{font-style:normal;display:inline-flex;align-items:center;gap:5px}
-.ly3 .legend i{width:24px;height:8px;border-radius:3px;background:#241f18;display:inline-block}
-.ly3 .legend i.yin{background:transparent;border-top:8px double #241f18;height:6px}
-.ly3 .legend i.dong-bar{background:#c8281d}
-.ly3 .lg-fu{font-style:normal;display:inline-block;font-size:9px;font-weight:700;line-height:1.1;color:#fff;background:linear-gradient(180deg,#c69c4e,#a87d22);padding:2px 4px;border-radius:3px}
-/* 窄屏：八列整体按比例缩 */
 @media (max-width:640px){
-  .ly3{--ly8:22px 40px minmax(0,1fr) minmax(0,1.15fr) 46px minmax(0,1.15fr) minmax(0,1fr) 40px}
-  .ly3 .wrap{padding:8px 4px}
-  .ly3 .lrows{gap:1px}
-  .ly3 .ghd{height:30px;margin-bottom:3px;padding-bottom:3px}
+  .ly3{--ly8:22px 40px minmax(0,1fr) minmax(0,1.15fr) 42px minmax(0,1.15fr) minmax(0,1fr) 38px;
+       --ly5:26px 46px 82px 96px 34px}
+  .ly3 .wrap{padding:10px 4px}
   .ly3 .ghd .gt{font-size:16px}
-  .ly3 .ghd .gt i{font-size:10.5px;margin-left:2px}
-  .ly3 .lrow{gap:3px;height:42px}
-  .ly3 .ls{font-size:13px}
-  .ly3 .lq{font-size:11.5px}
-  .ly3 .lq i{font-size:8.5px;padding:0 1px}
-  .ly3 .lgan{font-size:9px}
-  .ly3 .lz{font-size:14px}
-  .ly3 .lfu-badge{font-size:8px;padding:1px 3px}
-  .ly3 .ltack{display:flex;justify-content:center}
-  .ly3 .yao{width:100%;max-width:60px;height:9px}
+  .ly3 .lrow{gap:2px;height:44px}
+  .ly3 .ls{font-size:13.5px}
+  .ly3 .lq{font-size:12px}
+  .ly3 .lz{font-size:14.5px}
+  .ly3 .yao{width:100%;max-width:62px;height:9px}
+  .ly3 .lrow.single .yao{max-width:86px;height:10px}
   .ly3 .yao.yin::before,.ly3 .yao.yin::after{height:9px}
-  .ly3 .lmk{font-size:12px}
-  .ly3 .ltag{font-size:9px;padding:0 2px}
+  .ly3 .lrow.single .yao.yin::before,.ly3 .lrow.single .yao.yin::after{height:10px}
   .ly3 .gz4 b{font-size:19px}
+  .ly3 .ss-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px 4px}
+  .ly3 .ss-item{font-size:12px}
 }
 @media (max-width:420px){
-  .ly3{--ly8:20px 34px minmax(0,1fr) minmax(0,1fr) 38px minmax(0,1fr) minmax(0,1fr) 34px}
-  .ly3 .ghd{height:28px}
-  .ly3 .ghd .gt{font-size:15px}
-  .ly3 .lrow{gap:2px;height:38px}
-  .ly3 .ls{font-size:12px}
-  .ly3 .lq{font-size:10.5px}
-  .ly3 .lq i{display:none}
-  .ly3 .lgan{font-size:8.5px}
-  .ly3 .lz{font-size:13px}
-  .ly3 .lfu-badge{font-size:7.5px;padding:0.5px 2px}
-  .ly3 .lfu-badge em{display:none}
-  .ly3 .yao{height:8px;max-width:52px}
-  .ly3 .yao.yin::before,.ly3 .yao.yin::after{height:8px}
-  .ly3 .lmk{font-size:11px}
-  .ly3 .ltag{font-size:8.5px;padding:0 1px}
-  .ly3 .iro{grid-template-columns:56px 1fr}.ly3 .ik{letter-spacing:1px;padding:9px 2px}
+  .ly3{--ly8:20px 34px minmax(0,1fr) minmax(0,1fr) 36px minmax(0,1fr) minmax(0,1fr) 34px;
+       --ly5:24px 42px 76px 88px 32px}
+  .ly3 .iro{grid-template-columns:54px 1fr}.ly3 .ik{letter-spacing:1px;padding:8px 2px}
+  .ly3 .ss-item{font-size:11.5px}
 }
-/* —— 卦辞解释（本卦/变卦 tab） —— */
+/* —— 卦辞解释 —— */
 .ly3 .gc{margin:0 12px 12px;background:#fffdf8;border:1px solid var(--line);border-radius:11px;overflow:hidden}
 .ly3 .gc input{display:none}
 .ly3 .gc-tabs{order:-1;display:flex;border-bottom:1px solid var(--line)}
-.ly3 .gc-tabs label{flex:1;text-align:center;padding:9px 0;font-size:13.5px;color:var(--sub);cursor:pointer;letter-spacing:1px;transition:.15s}
-.ly3 .gc-tabs label b{font-family:"Noto Serif SC",serif;font-size:14.5px}
+.ly3 .gc-tabs label{flex:1;text-align:center;padding:8px 0;font-size:13px;color:var(--sub);cursor:pointer;letter-spacing:1px}
+.ly3 .gc-tabs label b{font-family:"Noto Serif SC",serif;font-size:14px}
 .ly3 #gcBen:checked~.gc-tabs label[for=gcBen],
 .ly3 #gcBian:checked~.gc-tabs label[for=gcBian]{background:#2a7e6e;color:#fff;font-weight:700}
-.ly3 .gc-pane{display:none;padding:12px 15px;font-size:13px;line-height:2;color:#4a4438}
+.ly3 .gc-pane{display:none;padding:11px 14px;font-size:13px;line-height:1.85;color:#4a4438}
 .ly3 #gcBen:checked~.gc-pane.ben,.ly3 #gcBian:checked~.gc-pane.bian{display:block}
-.ly3 .gc-pane h4{margin:0 0 4px;font-size:12px;color:var(--gold);letter-spacing:2px}
-.ly3 .gc-pane .gct{font-family:"Noto Serif SC",serif;font-size:14.5px;color:#2c2418;letter-spacing:.5px}
+.ly3 .gc-pane h4{margin:0 0 3px;font-size:11.5px;color:var(--gold);letter-spacing:1.5px}
+.ly3 .gc-pane .gct{font-family:"Noto Serif SC",serif;font-size:14px;color:#2c2418}
 .ly3 .gc-pane .gcx{color:#6d6353}
 .ly3 .gc-pane .gcd{color:#8a5a28;font-weight:600}
-.ly3 .gc-note{padding:0 15px 10px;font-size:10.5px;color:#b3a98f}
 `;
 
 const fmtJd = (jd) => {
@@ -184,143 +157,224 @@ const fmtJd = (jd) => {
   return `${ymd.year}.${String(ymd.month).padStart(2, '0')}.${String(ymd.day).padStart(2, '0')} ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
+/**
+ * 规整六爻神煞为热卜式整齐短标签（合并贵人、剔除冗余「（年）」与爻位尾巴，严格 4 列对齐）
+ */
+function buildCleanShenshaList(f) {
+  const out = [];
+  if (f.guaShen?.zhi) {
+    out.push({ name: '卦身', val: f.guaShen.zhi, inGua: true, tip: f.guaShen.source || '卦身' });
+  }
+  const raw = list(f.shensha);
+  const guirenZhis = [];
+  const seen = new Set(['卦身']);
+
+  const SHORT_NAME = {
+    天乙贵人: '贵人',
+    禄神: '日禄',
+  };
+
+  for (const s of raw) {
+    if (!s || !s.name) continue;
+    // 跳过带（年）的重复项，保持和热卜一致的清爽单锚展示
+    if (s.name.includes('（年）') || s.name.includes('(年)')) continue;
+    const target = s.zhi || s.gan || '';
+    if (!target) continue;
+    if (s.name === '天乙贵人') {
+      if (!guirenZhis.includes(target)) guirenZhis.push(target);
+      continue;
+    }
+    const cleanName = SHORT_NAME[s.name] || s.name;
+    if (seen.has(cleanName)) continue;
+    seen.add(cleanName);
+    out.push({
+      name: cleanName,
+      val: target,
+      inGua: s.lineIndex !== null && s.lineIndex !== undefined,
+      tip: `${s.name}：${s.source || ''}`,
+    });
+  }
+
+  if (guirenZhis.length) {
+    // 将合并后的「贵人--寅午」插入在前排常用位
+    out.splice(Math.min(7, out.length), 0, {
+      name: '贵人',
+      val: guirenZhis.join(''),
+      inGua: false,
+      tip: '天乙贵人：甲戊庚牛羊，乙己鼠猴乡，丙丁猪鸡位，壬癸兔蛇藏，六辛逢马虎',
+    });
+  }
+  return out;
+}
+
 export function renderLiuyao(f) {
   const ben = f.benGua || {};
   const bian = f.bianGua || {};
   const siZhu = f.siZhu || {};
   const guaShen = f.guaShen || {};
+  const guaShenZhi = guaShen.zhi || '';
+
+  // 判定是否为【静卦】（无动爻，且变卦与本卦相同）
+  const isStaticGua = list(f.dongYao).length === 0 && (!bian.name || bian.name === ben.name);
 
   // —— ① 信息表 ——
   const dayNumber = Math.floor((f.time?.jdSolar ?? 0) + 0.5);
   const solarYmd = dayNumber ? jdnToYmd(dayNumber) : null;
   const dateStr = solarYmd
-    ? `${solarYmd.year}年${solarYmd.month}月${solarYmd.day}日${f.lunar ? `（农历${f.lunar.monthName}${f.lunar.dayName}）` : ''}`
+    ? `${solarYmd.year}年${solarYmd.month}月${solarYmd.day}日${f.lunar ? `（${f.lunar.monthName}${f.lunar.dayName}）` : ''}`
     : (f.lunar ? `农历${f.lunar.monthName}${f.lunar.dayName}` : '—');
   const jieRange = f.yueJian?.jieName
-    ? `${f.yueJian.jieName} ${fmtJd(f.yueJian.jieJd)} ~ ${f.yueJian.nextName || ''} ${fmtJd(f.yueJian.nextJd)}`
+    ? `${f.yueJian.jieName}${fmtJd(f.yueJian.jieJd)} ~ ${f.yueJian.nextName || ''}${fmtJd(f.yueJian.nextJd)}`
     : '—';
 
-  // 四柱干支：全部用墨黑色，唯独【月支（月建）】【日支（日辰）】用红色（六爻断卦以月建日辰为纲领）
+  // 对标热卜六爻：月柱与日柱的天干、地支整柱标红（#c8281d），年柱与时柱墨黑
   const gzCell = (k, label) => {
     const p = siZhu[k];
     if (!p) return `<span><b>—</b></span>`;
-    const isKeyZhi = k === 'month' || k === 'day';
-    return `<span><b>${esc(p.name[0])}</b><b class="${isKeyZhi ? 'gz-key' : ''}">${esc(p.zhi)}</b><span>${label}</span></span>`;
+    const isKeyPillar = k === 'month' || k === 'day';
+    const cls = isKeyPillar ? ' class="gz-key"' : '';
+    return `<span><b${cls}>${esc(p.name[0])}</b><b${cls}>${esc(p.zhi)}</b><span>${label}</span></span>`;
   };
   const xkCell = (k) => `<span>${esc(siZhu[k]?.xunkong?.join('') || '—')}</span>`;
 
   const infoRows = [
     ['事项', `<span class="q">${esc(f.question || '（未填写所问事项）')}</span>`],
     ['日期', esc(dateStr)],
-    ['卦式', esc(METHOD_NAME[f.method] || f.method || '—')],
+    ['卦式', `【${esc(METHOD_NAME[f.method] || f.method || '—')}】`],
     ['节气', esc(jieRange)],
     ['干支', `<div class="gz4">${gzCell('year', '年柱')}${gzCell('month', '月柱')}${gzCell('day', '日柱')}${gzCell('hour', '时柱')}</div>`],
     ['空亡', `<div class="xk4">${xkCell('year')}${xkCell('month')}${xkCell('day')}${xkCell('hour')}</div>`],
   ].map(([k, v]) => `<div class="iro"><div class="ik">${k}</div><div class="iv">${v}</div></div>`).join('');
 
-  // —— ② 神煞区 ——
-  const ssItems = list(f.shensha).map((s) => {
-    const inGua = s.lineIndex !== null && s.lineIndex !== undefined;
-    const target = s.zhi || s.gan || '—';
-    return `<span class="ss-item${inGua ? ' in' : ''}" title="${esc(s.source || '')}（${esc(s.anchor || '')}起）">
-      <b>${esc(s.name)}</b>--${esc(target)}${inGua ? `<i>${esc(list(f.lines)[s.lineIndex]?.position || '')}</i>` : ''}
-    </span>`;
+  // —— ② 神煞区（严格 4 列网格 + 右上角收起/展开按钮） ——
+  const cleanSs = buildCleanShenshaList(f);
+  const ssCells = cleanSs.map((s, idx) => {
+    // 第一行第 4 列右侧附带「收起」按钮（对标热卜版式）
+    if (idx === 3) {
+      return `<span class="ss-item${s.inGua ? ' in' : ''}" title="${esc(s.tip)}" style="display:flex;align-items:center;justify-content:space-between">
+        <span><b>${esc(s.name)}</b>--${esc(s.val)}</span>
+        <button type="button" class="ss-toggle" onclick="var w=this.closest('.ss-wrap');w.classList.toggle('is-folded');this.textContent=w.classList.contains('is-folded')?'展开':'收起'">收起</button>
+      </span>`;
+    }
+    return `<span class="ss-item${s.inGua ? ' in' : ''}" title="${esc(s.tip)}"><b>${esc(s.name)}</b>--${esc(s.val)}</span>`;
   }).join('');
-  const shenshaBlock = ssItems
-    ? `<div class="iro"><div class="ik">神煞</div><div class="iv" style="display:block"><div class="ss-grid">${ssItems}</div>
-        <div class="ss-note">神煞以日辰、月建、年君为锚起出；金色者落于卦中（标注爻位），悬停可看起法口诀</div></div></div>`
+
+  const shenshaBlock = ssCells
+    ? `<div class="iro"><div class="ik">神煞</div><div class="iv"><div class="ss-wrap"><div class="ss-grid">${ssCells}</div></div></div></div>`
     : '';
 
-  // —— ③ 卦象区 ——
-  const guaShenZhi = guaShen.zhi || '';
-
+  // —— ③ 卦象区（静卦单卦居中 vs 动卦双卦并排） ——
   const genTag = (g) => (g && g !== '本宫' ? `·${esc(g)}` : '');
-
-  /** 一行 = 本卦四列（六兽·六亲·纳甲·爻画）｜中缝｜变卦四列（爻画·纳甲·六亲） */
-  const guaRows = (benLines, bianLines) => benLines.map((l, i) => {
-    const y = !!l.yang;
-    const cls = ['lrow', l.isShi ? 'shi' : '', l.isYing ? 'ying' : '', l.isDong ? 'dong' : ''].filter(Boolean).join(' ');
-    const rowTitle = l.isDong
-      ? ' title="' + esc(l.position + ' · ' + (y ? '老阳（0）动而变阴' : '老阴（X）动而变阳')) + '"'
-      : '';
-    // 伏神：绝对定位贴于纳甲正下方，不占横向流式宽度，绝不挤歪丁丑等干支列
-    const fuBadge = (l.fuShow && l.fuZhi)
-      ? '<i class="lfu-badge" title="伏神：' + esc(l.fuLiuqin) + esc(l.fuGan || '') + esc(l.fuZhi) + '，伏于' + esc(l.position) + '（飞神' + esc(l.liuqin) + esc(l.gan || '') + esc(l.zhi) + '）">伏' + esc(l.fuLiuqin) + '<em>' + esc(l.fuZhi) + '</em></i>'
-      : '';
-    // 身 / 破 / 空：六亲右侧极小方块角标
-    const marks = [
-      (guaShenZhi && l.zhi === guaShenZhi) ? '身' : '',
-      l.yuePo ? '破' : '',
-      l.xunkong ? '空' : '',
-    ].filter(Boolean);
-    const mark = marks.map((m) => `<i class="${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
-    const markTitle = marks.length
-      ? ' title="六亲：' + esc(l.liuqin) + '（' + esc(l.position) + '）' + marks.map((m) => ({ 身: '卦身', 破: '月破', 空: '旬空' })[m]).join('、') + '"'
-      : '';
-    // 中缝：动爻 0→ / X→（朱红），静爻位标 世 / 应（金底小方块）
-    const mid = l.isDong
-      ? `<i class="lmk">${y ? '0' : 'X'}→</i>`
-      : (l.isShi ? '<i class="ltag">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : ''));
-    const b = bianLines[i] || {};
-    return `<div class="${cls}"${rowTitle}>
-      <div class="ls">${esc(SHEN_CHAR[l.liushen] || '—')}</div>
-      <div class="lq"${markTitle}>${esc(l.liuqin)}${mark}</div>
-      <div class="lzc">
-        <span class="lzc-core"><span class="lgan">${esc(l.gan || '')}</span><span class="lz">${esc(l.zhi)}</span></span>${fuBadge}
-      </div>
-      <div class="ltack"><span class="yao ${y ? 'yang' : 'yin'}"></span></div>
-      <div class="lmc">${mid}</div>
-      <div class="ltack"><span class="yao ${b.yang ? 'yang' : 'yin'}"></span></div>
-      <div class="lzc">
-        <span class="lzc-core"><span class="lgan">${esc(b.gan || '')}</span><span class="lz">${esc(b.zhi || '—')}</span></span>
-      </div>
-      <div class="lq">${esc(b.liuqin || '')}</div>
-    </div>`;
-  }).join('');
-
   const benRaw = list(f.lines);
   const benLines = benRaw.slice().reverse();
   const bianRaw = list(f.bianLines).length ? list(f.bianLines) : benRaw;
   const bianLines = bianRaw.slice().reverse();
 
-  const guaHead = `<div class="ghd">
-      <div class="gt b">${esc(ben.name)}<i>${esc(ben.gong || '')}宫${esc(ben.gongElement || '')}${genTag(ben.generation)}</i></div>
-      <div class="gt y">${esc(bian.name)}${esc(bian.gong || '') ? `<i>${esc(bian.gong || '')}宫${esc(bian.gongElement || '')}</i>` : ''}</div>
-    </div>`;
-  const guaBlock = `<div class="lrows">${guaRows(benLines, bianLines)}</div>`;
+  let guaHead = '';
+  let guaBlock = '';
 
-  // —— 卦辞解释（本卦 / 变卦 tab） ——
-  const gcPane = (name, cls, paneId, labId, checked) => {
+  if (isStaticGua) {
+    // 静卦：对标热卜，居中仅展示一个本卦！
+    guaHead = `<div class="ghd single">
+      <div class="gt single">${esc(ben.name)}<i>(${esc(ben.gong || '')}${genTag(ben.generation)})</i></div>
+    </div>`;
+    const singleRows = benLines.map((l) => {
+      const y = !!l.yang;
+      const cls = ['lrow single', l.isShi ? 'shi' : '', l.isYing ? 'ying' : ''].filter(Boolean).join(' ');
+      const fuBadge = (l.fuShow && l.fuZhi)
+        ? `<i class="lfu-badge" title="伏神：${esc(l.fuLiuqin)}${esc(l.fuGan || '')}${esc(l.fuZhi)}">伏神: ${esc(l.fuLiuqin)}<em>${esc(l.fuZhi)}</em></i>`
+        : '';
+      const marks = [
+        (guaShenZhi && l.zhi === guaShenZhi) ? '身' : '',
+        l.yuePo ? '破' : '',
+        l.xunkong ? '空' : '',
+      ].filter(Boolean);
+      const mark = marks.map((m) => `<i class="${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
+      const shiYingTag = l.isShi ? '<i class="ltag">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : '');
+      return `<div class="${cls}">
+        <div class="ls">${esc(SHEN_CHAR[l.liushen] || '—')}</div>
+        <div class="lq">${esc(l.liuqin)}${mark}</div>
+        <div class="lzc">
+          <span class="lzc-core"><span class="lz">${esc(l.zhi)}${esc(l.zhiElement || '')}</span><span class="lgan">${esc(l.gan || '')}</span></span>${fuBadge}
+        </div>
+        <div class="ltack"><span class="yao ${y ? 'yang' : 'yin'}"></span></div>
+        <div class="lmc">${shiYingTag}</div>
+      </div>`;
+    }).join('');
+    guaBlock = `<div class="lrows single">${singleRows}</div>`;
+  } else {
+    // 动变之卦：左右并排展示本卦与变卦
+    guaHead = `<div class="ghd">
+      <div class="gt b">${esc(ben.name)}<i>(${esc(ben.gong || '')}${genTag(ben.generation)})</i></div>
+      <div class="gt y">${esc(bian.name)}${esc(bian.gong || '') ? `<i>(${esc(bian.gong || '')}${genTag(bian.generation)})</i>` : ''}</div>
+    </div>`;
+    const dualRows = benLines.map((l, i) => {
+      const y = !!l.yang;
+      const cls = ['lrow', l.isShi ? 'shi' : '', l.isYing ? 'ying' : '', l.isDong ? 'dong' : ''].filter(Boolean).join(' ');
+      const fuBadge = (l.fuShow && l.fuZhi)
+        ? `<i class="lfu-badge" title="伏神：${esc(l.fuLiuqin)}${esc(l.fuGan || '')}${esc(l.fuZhi)}">伏${esc(l.fuLiuqin)}<em>${esc(l.fuZhi)}</em></i>`
+        : '';
+      const marks = [
+        (guaShenZhi && l.zhi === guaShenZhi) ? '身' : '',
+        l.yuePo ? '破' : '',
+        l.xunkong ? '空' : '',
+      ].filter(Boolean);
+      const mark = marks.map((m) => `<i class="${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
+      const mid = l.isDong
+        ? `<i class="lmk">${y ? '0' : 'X'}→</i>`
+        : (l.isShi ? '<i class="ltag">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : ''));
+      const b = bianLines[i] || {};
+      return `<div class="${cls}">
+        <div class="ls">${esc(SHEN_CHAR[l.liushen] || '—')}</div>
+        <div class="lq">${esc(l.liuqin)}${mark}</div>
+        <div class="lzc">
+          <span class="lzc-core"><span class="lgan">${esc(l.gan || '')}</span><span class="lz">${esc(l.zhi)}</span></span>${fuBadge}
+        </div>
+        <div class="ltack"><span class="yao ${y ? 'yang' : 'yin'}"></span></div>
+        <div class="lmc">${mid}</div>
+        <div class="ltack"><span class="yao ${b.yang ? 'yang' : 'yin'}"></span></div>
+        <div class="lzc">
+          <span class="lzc-core"><span class="lgan">${esc(b.gan || '')}</span><span class="lz">${esc(b.zhi || '—')}</span></span>
+        </div>
+        <div class="lq">${esc(b.liuqin || '')}</div>
+      </div>`;
+    }).join('');
+    guaBlock = `<div class="lrows">${dualRows}</div>`;
+  }
+
+  // —— 卦辞解释（静卦仅显示本卦卦辞，有变卦才显示本/变切换 Tab） ——
+  const gcPane = (name, cls, labId, checked) => {
     const gc = guaciOf(name) || { guaCi: '（暂无卦辞）', xiang: '', duan: '' };
     return `<input type="radio" name="gcTab" id="${labId}"${checked ? ' checked' : ''}>
       <div class="gc-pane ${cls}">
         <h4>卦辞</h4>
         <div class="gct">${esc(name)}：${esc(gc.guaCi)}</div>
-        <h4 style="margin-top:8px">象曰</h4>
+        <h4 style="margin-top:6px">象曰</h4>
         <div class="gcx">${esc(gc.xiang)}</div>
-        <h4 style="margin-top:8px">断语</h4>
+        <h4 style="margin-top:6px">断语</h4>
         <div class="gcd">${esc(gc.duan)}</div>
       </div>`;
   };
-  const guaciBlock = `<div class="gc">
-    ${gcPane(ben.name, 'ben', 0, 'gcBen', true)}
-    ${gcPane(bian.name, 'bian', 0, 'gcBian', false)}
-    <div class="gc-tabs">
-      <label for="gcBen"><b>本卦：${esc(ben.name)}</b></label>
-      <label for="gcBian"><b>变卦：${esc(bian.name)}</b></label>
-    </div>
-    <div class="gc-note">卦辞、象曰引自《周易》；断语为通义概括，具体吉凶须结合所测之事与动爻定夺。</div>
-  </div>`;
+  const guaciBlock = isStaticGua
+    ? `<div class="gc">${gcPane(ben.name, 'ben', 'gcBen', true)}</div>`
+    : `<div class="gc">
+        ${gcPane(ben.name, 'ben', 'gcBen', true)}
+        ${gcPane(bian.name, 'bian', 'gcBian', false)}
+        <div class="gc-tabs">
+          <label for="gcBen"><b>本卦：${esc(ben.name)}</b></label>
+          <label for="gcBian"><b>变卦：${esc(bian.name)}</b></label>
+        </div>
+      </div>`;
 
   const benLinesAll = list(f.lines);
   const dongNames = list(f.dongYao).map((d) => {
     const bl = benLinesAll[d.index];
     return `${d.position}（${bl && bl.yang ? '老阳 0' : '老阴 X'}）`;
-  }).join('、') || '无（静卦）';
+  }).join('、') || '六爻安静（静卦）';
   const fuList = benLinesAll.filter((l) => l.fuShow && l.fuZhi);
   const fuText = fuList.length
     ? fuList.map((l) => `${esc(l.fuLiuqin)}·伏${esc(l.fuGan || '')}${esc(l.fuZhi)}于${esc(l.position)}`).join('　')
-    : '无（六亲俱全，不伏）';
+    : '六亲俱全（不伏）';
   const prop = (k, v) => `<span><span class="k">${esc(k)}</span> <b>${v}</b></span>`;
 
   return `<style class="ly3-style">${CSS}</style><div class="ly3">
@@ -332,13 +386,6 @@ export function renderLiuyao(f) {
         ${guaBlock}
       </div>
       ${guaciBlock}
-      <div class="legend">
-        <em><i></i>静爻（墨黑）</em><em><i class="dong-bar"></i>动爻（朱红）</em>
-        <em><b style="color:#c8281d">0→</b> 老阳·动</em><em><b style="color:#c8281d">X→</b> 老阴·动</em>
-        <em><span class="ltag">世</span>世爻</em><em><span class="ltag">应</span>应爻</em>
-        <em><span class="ltag kk">空</span>旬空 · <span class="ltag po">破</span>月破 · <span class="ltag bd">身</span>卦身</em>
-        <em>四柱唯【月支·日支】标红；<span class="lg-fu" style="vertical-align:baseline">伏子孙申</span>伏神居中下挂不挤占干支列</em>
-      </div>
       <div class="props">
         <div class="prow">
           ${prop('月建', `${esc(f.yueJian.zhi)}月（${esc(f.yueJian.element)}）`)}
@@ -348,9 +395,8 @@ export function renderLiuyao(f) {
           ${prop('动爻', esc(dongNames))}
           ${prop('伏神', fuText)}
           ${prop('卦身', esc(guaShenZhi || '—'))}
-          ${prop('用神', esc(f.yongshen))}
+          ${prop('取用神', esc(f.yongshen))}
         </div>
-        ${f.yongshenNote ? `<div class="prow" style="color:#a08b62">${esc(f.yongshenNote)}</div>` : ''}
       </div>
     </div>
   </div>`;

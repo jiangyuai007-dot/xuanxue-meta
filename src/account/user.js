@@ -55,7 +55,8 @@ function validate(email, password) {
 }
 
 function publicUser(u) {
-  return { id: u.id, email: u.email, createdAt: u.createdAt, lastLoginAt: u.lastLoginAt || null };
+  const defaultName = (u.email || '').split('@')[0] || '玄机命友';
+  return { id: u.id, email: u.email, nickname: u.nickname || defaultName, createdAt: u.createdAt, lastLoginAt: u.lastLoginAt || null };
 }
 
 /** 签发会话令牌：base64url(载荷) + '.' + HMAC-SHA256 */
@@ -70,7 +71,7 @@ function issueToken(user) {
  * 注册
  * @returns {{ user:object, token:string }}
  */
-export function register({ email, password } = {}) {
+export function register({ email, password, nickname = '' } = {}) {
   const e = validate(email, password);
   const list = loadUsers();
   if (list.some((u) => u.email === e)) throw new Error('该邮箱已注册，请直接登录');
@@ -78,6 +79,7 @@ export function register({ email, password } = {}) {
   const user = {
     id: 'U' + crypto.randomBytes(6).toString('hex').toUpperCase(),
     email: e,
+    nickname: String(nickname || '').trim().slice(0, 24) || e.split('@')[0],
     salt,
     hash: hashPassword(password, salt),
     createdAt: new Date().toISOString(),

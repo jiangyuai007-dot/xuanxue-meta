@@ -45,14 +45,14 @@
       if (window.caches && typeof window.caches.keys === 'function') {
         window.caches.keys().then(function (keys) {
           keys.forEach(function (k) {
-            if (k.indexOf('v2.4') === -1) window.caches.delete(k);
+            if (k.indexOf('v2.5') === -1) window.caches.delete(k);
           });
         });
       }
     } catch (e) {}
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/sw.js?v=20261024v24').then(function (reg) {
+        navigator.serviceWorker.register('/sw.js?v=20261024v25').then(function (reg) {
           if (reg && typeof reg.update === 'function') reg.update();
         }).catch(function () {});
       });
@@ -474,7 +474,8 @@
       ctx.textAlign = 'left';
       ctx.fillStyle = '#2f2a22';
       ctx.font = 'bold 48px "Noto Serif SC",serif';
-      ctx.fillText('本卦：' + f.benGua.name + '　→　变卦：' + f.bianGua.name, 120, 325);
+      var isStaticLy = (!f.dongYao || !f.dongYao.length) && (!f.bianGua || f.bianGua.name === f.benGua.name);
+      ctx.fillText(isStaticLy ? ('本卦：' + f.benGua.name + '（六爻安静 · 静卦）') : ('本卦：' + f.benGua.name + '　→　变卦：' + f.bianGua.name), 120, 325);
       ctx.fillStyle = '#6b5640';
       ctx.font = '28px "PingFang SC",sans-serif';
       ctx.fillText(f.benGua.gong + '宫' + f.benGua.gongElement + ' · ' + f.benGua.generation + '卦　｜　世爻：' + (f.shiYing ? f.shiYing.shiPosition : '—') + ' · 应爻：' + (f.shiYing ? f.shiYing.yingPosition : '—'), 120, 405);
@@ -581,9 +582,146 @@
     ]
   };
 
+  var feedbackModal = null;
+
+  function ensureFeedbackModal() {
+    if (feedbackModal) return feedbackModal;
+    var curSys = (document.body && document.body.dataset && document.body.dataset.sys) || 'general';
+    var wrap = document.createElement('div');
+    wrap.id = 'xjFeedbackModal';
+    wrap.className = 'xj-modal';
+    wrap.innerHTML =
+      '<div class="xj-mask" data-fbk-close="1"></div>' +
+      '<div class="xj-panel" role="dialog" aria-modal="true" aria-labelledby="xjFbkTitle" style="max-width:520px;width:94%">' +
+        '<div class="xj-head">' +
+          '<div class="xj-title" id="xjFbkTitle">💬 意见反馈与产品建议</div>' +
+          '<button type="button" class="xj-close" data-fbk-close="1" aria-label="关闭反馈弹窗">×</button>' +
+        '</div>' +
+        '<form id="xjModalFbkForm" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+            '<div>' +
+              '<label for="xjFbkCat" style="font-size:12px;color:#6b5640;display:block;margin-bottom:3px">反馈类型</label>' +
+              '<select id="xjFbkCat" class="mr-in mr-in-sm" style="width:100%">' +
+                '<option value="ui_ux">📱 界面与手机适配</option>' +
+                '<option value="algorithm">☯️ 排盘与历法建议</option>' +
+                '<option value="feature">✨ 新功能许愿</option>' +
+                '<option value="bug">🐞 异常与 Bug 报错</option>' +
+                '<option value="other">💡 其它建议</option>' +
+              '</select>' +
+            '</div>' +
+            '<div>' +
+              '<label for="xjFbkRate" style="font-size:12px;color:#6b5640;display:block;margin-bottom:3px">体验评分</label>' +
+              '<select id="xjFbkRate" class="mr-in mr-in-sm" style="width:100%">' +
+                '<option value="5">★★★★★ 5分（非常满意）</option>' +
+                '<option value="4">★★★★☆ 4分（比较满意）</option>' +
+                '<option value="3">★★★☆☆ 3分（有待改进）</option>' +
+                '<option value="2">★★☆☆☆ 2分（体验欠佳）</option>' +
+                '<option value="1">★☆☆☆☆ 1分（急需整改）</option>' +
+              '</select>' +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<label for="xjFbkText" style="font-size:12px;color:#6b5640;display:block;margin-bottom:3px">具体问题描述或建议 <span style="color:#b3392c">*</span></label>' +
+            '<textarea id="xjFbkText" class="fbk-ta" rows="3" maxlength="1000" placeholder="请直白写下您觉得不好用、看不清或希望改进的地方（至少 4 个字）…"></textarea>' +
+          '</div>' +
+          '<div>' +
+            '<label for="xjFbkContact" style="font-size:12px;color:#6b5640;display:block;margin-bottom:3px">联系方式（选填）</label>' +
+            '<input type="text" id="xjFbkContact" class="mr-in mr-in-sm" maxlength="80" placeholder="微信号 / 邮箱 / 手机号（选填）">' +
+          '</div>' +
+          '<div id="xjFbkMsg" style="font-size:12.5px;min-height:18px;color:#1f6e43"></div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+            '<a href="mine.html#feedbackSection" style="font-size:12px;color:#8c6418;text-decoration:underline">查看我的历史反馈记录 →</a>' +
+            '<button type="submit" class="primary mini" id="xjFbkSubmitBtn" style="height:36px;padding:0 18px">提交反馈</button>' +
+          '</div>' +
+        '</form>' +
+      '</div>';
+    document.body.appendChild(wrap);
+    feedbackModal = wrap;
+
+    wrap.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('[data-fbk-close]')) {
+        wrap.style.display = 'none';
+      }
+    });
+
+    document.getElementById('xjModalFbkForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var tx = document.getElementById('xjFbkText');
+      var msgEl = document.getElementById('xjFbkMsg');
+      var btn = document.getElementById('xjFbkSubmitBtn');
+      var content = tx ? tx.value.trim() : '';
+      if (content.length < 4) {
+        if (msgEl) { msgEl.style.color = '#b3392c'; msgEl.textContent = '请填写至少 4 个字的具体反馈内容'; }
+        return;
+      }
+      if (btn) { btn.disabled = true; btn.textContent = '提交中…'; }
+      var headers = { 'Content-Type': 'application/json' };
+      try {
+        var tk = localStorage.getItem('xuanxue.session');
+        if (tk) headers['x-session-token'] = tk;
+      } catch (err) {}
+      fetch('/api/feedback', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          category: document.getElementById('xjFbkCat').value,
+          system: curSys,
+          rating: Number(document.getElementById('xjFbkRate').value) || 5,
+          content: content,
+          contact: document.getElementById('xjFbkContact').value.trim(),
+          pageUrl: location.pathname,
+        }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d || !d.ok) throw new Error((d && d.error) || '提交失败');
+          if (tx) tx.value = '';
+          if (msgEl) {
+            msgEl.style.color = '#1f6e43';
+            msgEl.textContent = '✓ 已收录（工单 ' + d.item.id + '）：' + (d.item.reply || '感谢您的反馈！');
+          }
+        })
+        .catch(function (err) {
+          if (msgEl) { msgEl.style.color = '#b3392c'; msgEl.textContent = err.message || '提交失败'; }
+        })
+        .finally(function () {
+          if (btn) { btn.disabled = false; btn.textContent = '提交反馈'; }
+        });
+    });
+
+    return wrap;
+  }
+
+  function openFeedbackModal() {
+    var curSys = (document.body && document.body.dataset && document.body.dataset.sys) || '';
+    if (curSys === 'mine' && document.getElementById('feedbackSection')) {
+      document.getElementById('feedbackSection').scrollIntoView({ behavior: 'smooth' });
+      var ta = document.getElementById('fbkContent');
+      if (ta) ta.focus();
+      return;
+    }
+    var modal = ensureFeedbackModal();
+    var msgEl = document.getElementById('xjFbkMsg');
+    if (msgEl) msgEl.textContent = '';
+    modal.style.display = 'flex';
+  }
+
+  window.__xjOpenFeedbackModal = openFeedbackModal;
+
   function injectTopbarAlmanacBtn() {
     var topStatus = document.querySelector('.topbar .top-status');
     if (!topStatus || document.getElementById('btnTopAlmanac')) return;
+    var fbkBtn = document.createElement('button');
+    fbkBtn.type = 'button';
+    fbkBtn.id = 'btnTopFeedback';
+    fbkBtn.className = 'btn-top-almanac';
+    fbkBtn.setAttribute('aria-label', '提交意见反馈');
+    fbkBtn.innerHTML = '💬 反馈';
+    fbkBtn.addEventListener('click', function () {
+      openFeedbackModal();
+    });
+    topStatus.appendChild(fbkBtn);
+
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'btnTopAlmanac';

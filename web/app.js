@@ -219,7 +219,7 @@ function setNow() {
 function syncMethodUi() {
   if (!$('method')) return;
   const m = $('method').value;
-  const show = (id, on) => { const e = $(id); if (e) e.style.display = on ? '' : 'none'; };
+  const show = (id, on) => { const e = $(id); if (e) { e.style.display = on ? '' : 'none'; e.hidden = !on; } };
   show('numWrap', m === 'number');
   show('numWrap2', m === 'number2');
   show('coinWrap', m === 'coin');
@@ -384,7 +384,7 @@ function syncTrigramGuaUi() {
   if ($("benGuaPreview")) $("benGuaPreview").textContent = "→ " + benName;
   if ($("guaName")) $("guaName").value = benName;
   const hasBian = $("hasBianGua") ? $("hasBianGua").checked : false;
-  if ($("bianGuaGroup")) $("bianGuaGroup").style.display = hasBian ? "inline-flex" : "none";
+  if ($("bianGuaGroup")) { $("bianGuaGroup").style.display = hasBian ? "inline-flex" : "none"; $("bianGuaGroup").hidden = !hasBian; }
   const yUp = $("bianUp") ? $("bianUp").value : bUp;
   const yLow = $("bianLow") ? $("bianLow").value : bLow;
   const bianName = hasBian ? ((GUA_BY_TRIGRAM[yUp] && GUA_BY_TRIGRAM[yUp][yLow]) || benName) : benName;
@@ -611,7 +611,8 @@ function showResultHead(facts, system) {
     main = `命宫${facts.mingGong.zhi}　身宫${facts.shenGong.zhi}　${facts.wuXingJu.name}`;
     sub = `紫微${facts.ziweiZhi}宫　天府${facts.tianfuZhi}宫　命主${facts.mingZhu || '—'} · 身主${facts.shenZhu || '—'}`;
   } else if (system === 'liuyao') {
-    main = `${facts.benGua.name} → ${facts.bianGua.name}`;
+    const isStatic = (!facts.dongYao || !facts.dongYao.length) && (!facts.bianGua || facts.bianGua.name === facts.benGua.name);
+    main = isStatic ? `${facts.benGua.name}（静卦）` : `${facts.benGua.name} → ${facts.bianGua.name}`;
     sub = `${facts.benGua.gong}宫 ${facts.benGua.gongElement}`;
   } else if (system === 'qimen') {
     main = `${facts.juName}　${facts.yuan}`;

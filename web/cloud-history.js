@@ -1,5 +1,5 @@
 /**
- * 云历史客户端（P0-2 & Phase 4）——「我的报告」与订单/退款共用的数据层
+ * 云历史客户端（P0-2 & Phase 4 & v2.5 意见反馈）——「我的报告」、订单/退款与意见反馈共用的数据层
  *
  * 会话：登录令牌存 localStorage['xuanxue.session']（与服务端 x-session-token 头对应）；
  * 游客不需要令牌，由服务端 httpOnly cookie 认设备。
@@ -82,7 +82,8 @@
 
     me: () => api('/api/auth/me'),
     login: (email, password) => api('/api/auth/login', { method: 'POST', body: { email, password } }),
-    register: (email, password) => api('/api/auth/register', { method: 'POST', body: { email, password } }),
+    register: (email, password, nickname = '') =>
+      api('/api/auth/register', { method: 'POST', body: { email, password, nickname } }),
     logout: () => api('/api/auth/logout', { method: 'POST' }),
     orders: () => api('/api/orders'),
     refundOrder: (orderId, reason = '用户自助申请退款') =>
@@ -95,5 +96,9 @@
     openReport: (id) => api('/api/reports/' + id + '/open', { method: 'POST' }),
     shareReport: (id) => api('/api/reports/' + id + '/share', { method: 'POST' }),
     removeReport: (id) => api('/api/reports/' + id, { method: 'DELETE' }),
+
+    listFeedbacks: () => api('/api/feedback'),
+    submitFeedback: (payload) => api('/api/feedback', { method: 'POST', body: payload }),
+    removeFeedback: (id) => api('/api/feedback/' + encodeURIComponent(id), { method: 'DELETE' }),
   };
 })();

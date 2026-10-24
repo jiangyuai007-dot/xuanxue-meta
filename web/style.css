@@ -1693,7 +1693,7 @@ body[data-sys="hepan"] .fb-actions .act-row-aux button {
     flex: 0 0 100% !important;
     width: 100% !important;
   }
-  .gua-pair-box {
+  .gua-pair-box:not([hidden]):not([style*="none"]) {
     width: 100% !important;
     display: flex !important;
     flex-wrap: nowrap !important;
@@ -1730,11 +1730,292 @@ body.has-paipan #chartEmpty, body.has-paipan #intro { display: none !important; 
   flex-wrap: wrap;
 }
 @media (max-width: 820px) {
-  .name-wrap {
+  .name-wrap:not([hidden]):not([style*="none"]) {
     display: flex !important;
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 6px !important;
     width: 100% !important;
   }
+  #nameWrap[hidden], #nameWrap[style*="none"],
+  #bianGuaGroup[hidden], #bianGuaGroup[style*="none"] {
+    display: none !important;
+  }
 }
+
+/* ==========================================================================
+   Phase 8 (v2.5)：个人中心与注册体验升级 + 意见反馈与产品建议工作台
+   ========================================================================== */
+.mr-header-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed #dfd1b4;
+}
+.mr-perks-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mr-perks-chips span {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6b4e16;
+  background: linear-gradient(135deg, #fbf4e3, #f2e3c2);
+  border: 1px solid #d8c292;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.mr-auth-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.mr-pwd-toggle {
+  font-size: 12px;
+  color: #6b5640;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+.mr-nick {
+  font-size: 14.5px;
+  color: #241d14;
+  font-family: var(--serif);
+}
+.mr-reg-extra {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+  background: #faf5e8;
+  border: 1px dashed #dfd1b4;
+  border-radius: 8px;
+  padding: 7px 12px;
+  margin-top: 2px;
+}
+.mr-nick-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 260px;
+}
+.mr-nick-wrap label {
+  font-size: 12px;
+  color: #5c4e3c;
+  white-space: nowrap;
+}
+.mr-in-sm {
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 4px 10px !important;
+  font-size: 13px !important;
+}
+.mr-pwd-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #6b5640;
+}
+.pm-bar {
+  width: 24px;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5dccb;
+  display: inline-block;
+  transition: background 0.2s;
+}
+.pm-bar.weak { background: #c83e2b; }
+.pm-bar.mid { background: #c6922c; }
+.pm-bar.strong { background: #267d4d; }
+
+/* 个人中心双模块卡片 */
+.mine-sec-card {
+  background: linear-gradient(180deg, #fffdf9 0%, #fbf6eb 100%);
+  border: 1px solid #dfd2b8;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 8px 22px -18px rgba(60, 42, 14, 0.22);
+}
+.mine-sec-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #ece2ce;
+}
+.mine-sec-hd h3 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 16.5px;
+  color: #241d14;
+}
+.mine-sec-sub {
+  font-size: 12px;
+  color: #7a6c58;
+}
+
+/* 意见反馈工作台 */
+.fbk-form {
+  background: #faf4e6;
+  border: 1px solid #e2d4b7;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.fbk-row-top {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.fbk-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fbk-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5c4d38;
+}
+.fbk-ta {
+  width: 100%;
+  border: 1px solid #d5c6a7;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #241d14;
+  background: #fffdf9;
+  font-family: inherit;
+  resize: vertical;
+}
+.fbk-ta:focus {
+  outline: none;
+  border-color: var(--gold, #b0812b);
+  box-shadow: 0 0 0 2px rgba(176, 129, 43, 0.16);
+}
+.fbk-row-bot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.fbk-history-wrap {
+  margin-top: 14px;
+}
+.fbk-his-hd {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a3d2c;
+  margin-bottom: 8px;
+}
+.fbk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fbk-card {
+  background: #fffdf9;
+  border: 1px solid #e4d9c3;
+  border-radius: 9px;
+  padding: 10px 12px;
+}
+.fbk-card-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.fbk-card-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.fbk-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 99px;
+}
+.fbk-badge.status {
+  background: #e6f4ec;
+  color: #1f6e43;
+  border: 1px solid #bce0c9;
+}
+.fbk-badge.cat {
+  background: #f5ebd6;
+  color: #7a5818;
+  border: 1px solid #dec89c;
+}
+.fbk-badge.sys {
+  background: #f2ede4;
+  color: #5c5040;
+}
+.fbk-stars {
+  color: #c48b1b;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.fbk-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: #7a6e5d;
+}
+.fbk-card-body {
+  font-size: 13.5px;
+  color: #241e18;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.fbk-card-reply {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: #f7f1e3;
+  border-left: 3px solid #9e731e;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #594a34;
+  line-height: 1.5;
+}
+@media (max-width: 720px) {
+  .fbk-row-top {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .mine-sec-card {
+    padding: 12px;
+  }
+  .mr-reg-extra {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .mr-nick-wrap {
+    flex: 1 1 auto;
+  }
+}
+

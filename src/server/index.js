@@ -28,6 +28,7 @@ import {
 import { entitledSections } from '../commerce/entitle.js';
 import { listChannels, handleNotify } from '../commerce/pay/index.js';
 import { register as accountRegister, login as accountLogin, verifySession, logout as accountLogout, userStats } from '../account/user.js';
+import { submitFeedback, listFeedbacks, removeFeedback, FEEDBACK_CATEGORIES } from '../account/feedback.js';
 import { saveReport, listReports, getReport, getReportByPackId, removeReport, touchReport } from '../account/reportstore.js';
 import { storageStats } from '../storage/db.js';
 import { computeAlmanac } from '../core/almanac.js';
@@ -802,7 +803,7 @@ function loadPack(id) {
 
   if (urlPath === '/api/auth/register' && req.method === 'POST') {
     try {
-      const r = accountRegister({ email: body.email, password: body.password });
+      const r = accountRegister({ email: body.email, password: body.password, nickname: body.nickname });
       return sendJson(req, res, 200, { ok: true, user: r.user, token: r.token });
     } catch (e) {
       return sendJson(req, res, 400, { ok: false, error: e.message || '注册失败', code: 'BAD_INPUT' });
@@ -1166,6 +1167,45 @@ function loadPack(id) {
       });
     }
     return respond(req, res, { status: 200, contentType: 'text/html; charset=utf-8', buf: Buffer.from(html, 'utf8'), cacheControl: 'no-store' });
+  }
+
+
+  // ---------------------------------------------------------------- 用户意见反馈（v2.5 新增）
+  if (urlPath === '/api/feedback' && req.method === 'GET') {
+    const { owner } = ownerOf(req, res);
+    return sendJson(req, res, 200, {
+      ok: true,
+      categories: FEEDBACK_CATEGORIES,
+      items: listFeedbacks(owner),
+    });
+  }
+
+  if (urlPath === '/api/feedback' && req.method === 'POST') {
+    try {
+      const { owner, user } = ownerOf(req, res);
+      const item = submitFeedback({
+        owner,
+        userEmail: user ? user.email : '',
+        userNickname: user ? (user.nickname || '') : '',
+        category: body.category,
+        system: body.system,
+        rating: body.rating,
+        content: body.content,
+        contact: body.contact,
+        pageUrl: body.pageUrl,
+      });
+      return sendJson(req, res, 200, { ok: true, item });
+    } catch (e) {
+      return sendJson(req, res, 400, { ok: false, error: e.message || '提交反馈失败', code: 'BAD_INPUT' });
+    }
+  }
+
+  const fbDelMatch = urlPath.match(/^\/api\/feedback\/(FB[\w]+)$/);
+  if (fbDelMatch && req.method === 'DELETE') {
+    const { owner } = ownerOf(req, res);
+    const deleted = removeFeedback(fbDelMatch[1], owner);
+    if (!deleted) return sendJson(req, res, 404, { ok: false, error: '反馈记录不存在或无权删除', code: 'NOT_FOUND' });
+    return sendJson(req, res, 200, { ok: true, deleted: true });
   }
 
   // ---------------------------------------------------------------- 我的报告（云历史，P0-2）

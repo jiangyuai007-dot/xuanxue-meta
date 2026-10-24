@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>我的报告 · 玄机</title>
+<title>个人中心与意见反馈 · 玄机</title>
 <meta name="theme-color" content="#241d14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<link rel="stylesheet" href="style.css?v=20261024v24">
+<link rel="stylesheet" href="style.css?v=20261024v25">
 <link rel="stylesheet" href="fonts/subset.css">
 <style id="xj-v23-guard">
 .formbar:not(.is-collapsed) .form-summary-bar{display:none!important}
@@ -38,9 +38,10 @@
   #stageViewTabs{position:relative !important;top:auto !important;}
   body:not([data-sys="mine"]):not(.has-paipan) .rail-left{display:none !important;}
   body.has-paipan #chartEmpty, body.has-paipan #intro{display:none !important;}
+  #nameWrap[hidden],#nameWrap[style*="none"],#bianGuaGroup[hidden],#bianGuaGroup[style*="none"]{display:none !important;}
 </style>
 <script>
-try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k.indexOf("v2.4")===-1)caches.delete(k);});});if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.update();});});}catch(e){}
+try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k.indexOf("v2.5")===-1)caches.delete(k);});});if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.update();});});}catch(e){}
 </script>
 </head>
 <body data-sys="mine">
@@ -70,62 +71,89 @@ try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k
 
 <div id="svcBanner" class="svc-banner" style="display:none"></div>
 
-<!-- 账号区：登录后可跨设备查看；未登录时也可临时保存（仅这台设备） -->
+<!-- 账号中心：尊享国风会员与云同步卡片 -->
 <section class="formbar">
   <div class="fb-card">
     <div class="fb-fields mr-fields">
-      <h2 class="mr-h2">我的报告</h2>
-      <p class="mr-lead" id="mrLead">先登录，换设备也能看到同一份历史；不登录也能保存，但只在这台设备上。</p>
+      <div class="mr-header-bar">
+        <div>
+          <h2 class="mr-h2">玄机个人中心 · 云端命谱与会员权益</h2>
+          <p class="mr-lead" id="mrLead">登录或注册账号后，您的排盘档案、深度命书与已购权益将自动跨设备云端同步。</p>
+        </div>
+        <div class="mr-perks-chips">
+          <span>☁️ 命谱多端云同步</span>
+          <span>🔐 已购章节永久绑定</span>
+          <span>💬 专属意见反馈通道</span>
+        </div>
+      </div>
 
       <div id="acctBox" class="mr-acct">
-        <!-- 已登录态：头像 + 身份 + 右侧操作 -->
+        <!-- 已登录态：头像圆章 + 身份详情 + 快捷操作 -->
         <div id="acctOnline" class="mr-acct-on" hidden>
           <span class="mr-avatar" id="acctAvatar" aria-hidden="true">玄</span>
           <div class="mr-acct-id">
             <span class="mr-tag ok">已登录</span>
+            <strong class="mr-nick" id="acctNickname">玄机命友</strong>
             <span class="mr-email" id="acctEmail"></span>
           </div>
           <div class="mr-acct-acts">
-            <button class="mini" id="btnOrders" type="button">我的订单</button>
+            <button class="mini" id="btnJumpFeedback" type="button">💬 意见反馈</button>
+            <button class="mini" id="btnOrders" type="button">📦 我的订单</button>
             <button class="mini" id="btnLogout" type="button">退出登录</button>
           </div>
         </div>
 
-        <!-- 未登录态：分段切换「登录 / 注册」，同一时刻只有一套表单可见 -->
+        <!-- 未登录态：分段切换「登录 / 注册新账号」 -->
         <div id="acctGuest" class="mr-acct-off">
-          <div class="mr-seg" role="tablist" aria-label="账号操作">
-            <button type="button" role="tab" id="tabLogin" aria-selected="true"
-                    aria-controls="formLogin" class="mr-seg-btn">登录</button>
-            <button type="button" role="tab" id="tabRegister" aria-selected="false"
-                    aria-controls="formRegister" class="mr-seg-btn">注册新账号</button>
+          <div class="mr-auth-top">
+            <div class="mr-seg" role="tablist" aria-label="账号操作">
+              <button type="button" role="tab" id="tabLogin" aria-selected="true"
+                      aria-controls="formLogin" class="mr-seg-btn">账号登录</button>
+              <button type="button" role="tab" id="tabRegister" aria-selected="false"
+                      aria-controls="formRegister" class="mr-seg-btn">注册新账号</button>
+            </div>
+            <label class="mr-pwd-toggle">
+              <input type="checkbox" id="chkShowPwd"> 显示密码明文
+            </label>
           </div>
 
           <form id="formLogin" class="mr-form" autocomplete="off">
             <label class="mr-lb" for="lgEmail">邮箱</label>
-            <input class="mr-in" type="email" id="lgEmail" name="email" placeholder="you@example.com"
+            <input class="mr-in" type="email" id="lgEmail" name="email" placeholder="请输入登录邮箱 (you@example.com)"
                    autocomplete="username" spellcheck="false">
             <label class="mr-lb" for="lgPwd">密码</label>
-            <input class="mr-in" type="password" id="lgPwd" name="password" placeholder="至少 8 位"
+            <input class="mr-in" type="password" id="lgPwd" name="password" placeholder="请输入密码（至少 8 位）"
                    autocomplete="current-password" aria-describedby="lgPwdHint">
             <div class="mr-btns">
-              <button class="primary mini" type="submit">登录</button>
-              <button class="mini" type="button" id="btnToRegister">注册新账号</button>
+              <button class="primary mini" type="submit">立即登录</button>
+              <button class="mini" type="button" id="btnToRegister">去注册</button>
             </div>
-            <p class="mr-hint" id="lgPwdHint">密码至少 8 位，区分大小写。未注册过就点右侧「注册新账号」。</p>
+            <p class="mr-hint" id="lgPwdHint">✦ 密码至少 8 位，区分大小写。首次使用请点击右侧「去注册」一键开通云同步账号。</p>
           </form>
 
           <form id="formRegister" class="mr-form" autocomplete="off" hidden>
             <label class="mr-lb" for="rgEmail">邮箱</label>
-            <input class="mr-in" type="email" id="rgEmail" name="email" placeholder="you@example.com"
+            <input class="mr-in" type="email" id="rgEmail" name="email" placeholder="请输入常用邮箱 (用于找回报告与订单)"
                    autocomplete="username" spellcheck="false">
             <label class="mr-lb" for="rgPwd">密码</label>
-            <input class="mr-in" type="password" id="rgPwd" name="password" placeholder="至少 8 位"
+            <input class="mr-in" type="password" id="rgPwd" name="password" placeholder="请设置密码（至少 8 位）"
                    autocomplete="new-password" aria-describedby="rgPwdHint">
             <div class="mr-btns">
               <button class="primary mini" type="submit">注册并登录</button>
               <button class="mini" type="button" id="btnToLogin">返回登录</button>
             </div>
-            <p class="mr-hint" id="rgPwdHint">注册后自动登录，报告即存入你的账号，换设备也能看到同一份历史。</p>
+            <div class="mr-reg-extra">
+              <div class="mr-nick-wrap">
+                <label for="rgNickname">您的称呼/道号（选填）：</label>
+                <input class="mr-in mr-in-sm" type="text" id="rgNickname" name="nickname" maxlength="24" placeholder="如：林先生 / 玄机居士">
+              </div>
+              <div class="mr-pwd-meter" id="rgPwdMeter">
+                <span>密码安全度：</span>
+                <i class="pm-bar" id="pmBar1"></i><i class="pm-bar" id="pmBar2"></i><i class="pm-bar" id="pmBar3"></i>
+                <b id="pmText">待输入（至少8位）</b>
+              </div>
+            </div>
+            <p class="mr-hint" id="rgPwdHint">✦ 注册后即刻自动登录，密码经服务端 scrypt 加盐加密存储；本机已保存的排盘报告将自动归入您的账号。</p>
           </form>
         </div>
       </div>
@@ -134,16 +162,85 @@ try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k
   <div id="msg" aria-live="polite" class="msg"></div>
 </section>
 
-<!-- 报告列表 -->
+<!-- 主体双模块：1. 我的云端排盘报告 + 2. 意见反馈与产品建议中心 -->
 <div class="workbench">
   <section class="stage">
-    <div id="mrList" class="mr-list" aria-busy="true">
-      <p class="mr-empty">正在载入…</p>
+    <div class="mine-sec-card">
+      <div class="mine-sec-hd">
+        <h3>📜 我的云端命谱与报告档案</h3>
+        <span class="mine-sec-sub">点击「打开」即可按原参数秒级重排，不重复消耗额度</span>
+      </div>
+      <div id="mrList" class="mr-list" aria-busy="true">
+        <p class="mr-empty">正在载入…</p>
+      </div>
+      <p class="rail-note mr-note">
+        保存的是排盘参数与报告入口：打开时按参数确定性重排（同一份生辰永远得到同一份命盘）。分享链接 7 天内有效，可转发给亲友查看只读版本。
+      </p>
     </div>
-    <p class="rail-note mr-note">
-      保存的是排盘参数与报告入口：打开时按参数重排（同一份生辰永远得到同一份命盘），
-      不会重复消耗额度。分享链接 7 天内有效，可转发给他人查看只读版本。
-    </p>
+
+    <!-- 新增：产品级意见反馈与建议工作台 -->
+    <div class="mine-sec-card" id="feedbackSection">
+      <div class="mine-sec-hd">
+        <h3>💬 意见反馈与产品改进建议</h3>
+        <span class="mine-sec-sub">您的每一条真实使用体感，都将直接推动玄机下一版迭代</span>
+      </div>
+
+      <form id="formFeedback" class="fbk-form" autocomplete="off">
+        <div class="fbk-row-top">
+          <div class="fbk-field">
+            <label for="fbkCategory">反馈类型</label>
+            <select id="fbkCategory" class="mr-in mr-in-sm">
+              <option value="ui_ux">📱 界面排版与手机适配</option>
+              <option value="algorithm">☯️ 排盘历法与神煞算法</option>
+              <option value="feature">✨ 新功能与流派许愿</option>
+              <option value="bug">🐞 异常与 Bug 报错</option>
+              <option value="other">💡 其它综合建议</option>
+            </select>
+          </div>
+          <div class="fbk-field">
+            <label for="fbkSystem">涉及板块</label>
+            <select id="fbkSystem" class="mr-in mr-in-sm">
+              <option value="general">全站通用</option>
+              <option value="bazi">四柱八字</option>
+              <option value="liuyao">六爻占卜</option>
+              <option value="qimen">奇门遁甲</option>
+              <option value="ziwei">紫微斗数</option>
+              <option value="hepan">八字合盘</option>
+            </select>
+          </div>
+          <div class="fbk-field">
+            <label for="fbkRating">当前体验评分</label>
+            <select id="fbkRating" class="mr-in mr-in-sm">
+              <option value="5">★★★★★ 5分（非常满意）</option>
+              <option value="4">★★★★☆ 4分（比较满意）</option>
+              <option value="3">★★★☆☆ 3分（一般，有待改进）</option>
+              <option value="2">★★☆☆☆ 2分（体验欠佳）</option>
+              <option value="1">★☆☆☆☆ 1分（急需整改）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="fbk-field" style="margin-top:8px">
+          <label for="fbkContent">具体反馈内容 <span style="color:#b3392c">*</span></label>
+          <textarea id="fbkContent" class="fbk-ta" rows="3" maxlength="1000" placeholder="请直白描述您觉得不好用、看不清或希望调整的地方（例如：某个盘面在手机上字太小、希望增加某派排法等，至少 4 个字）…"></textarea>
+        </div>
+
+        <div class="fbk-row-bot">
+          <div class="fbk-field" style="flex:1;min-width:200px">
+            <label for="fbkContact">联系方式（选填，便于回访告知修复进度）</label>
+            <input type="text" id="fbkContact" class="mr-in mr-in-sm" maxlength="80" placeholder="微信号 / 邮箱 / 手机号（选填）">
+          </div>
+          <button type="submit" class="primary mini" id="btnSubmitFeedback" style="height:38px;padding:0 20px">提交意见反馈</button>
+        </div>
+      </form>
+
+      <div class="fbk-history-wrap">
+        <div class="fbk-his-hd">📋 我的反馈记录与受理状态</div>
+        <div id="fbkList" class="fbk-list">
+          <p class="mr-empty">正在载入反馈记录…</p>
+        </div>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -159,7 +256,7 @@ try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k
   本产品内容属传统文化参考，不构成医疗、投资、法律或任何决策建议
 </footer>
 
-<!-- 我的已购：沿用支付流程同一套 .xj-* 版式（数据取自服务端 /api/orders） -->
+<!-- 我的已购订单弹层 -->
 <div id="xjOrdersModal" class="xj-modal" hidden>
   <div id="xjOrdersMask" class="xj-mask"></div>
   <div id="xjOrdersPanel" class="xj-panel" role="dialog" aria-modal="true" aria-labelledby="xjOrdersTitle">
@@ -172,8 +269,8 @@ try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k
   </div>
 </div>
 
-<script src="cloud-history.js?v=20261024v24"></script>
-<script src="mine.js?v=20261024v24"></script>
-<script src="poster.js?v=20261024v24"></script>
+<script src="cloud-history.js?v=20261024v25"></script>
+<script src="mine.js?v=20261024v25"></script>
+<script src="poster.js?v=20261024v25"></script>
 </body>
 </html>
