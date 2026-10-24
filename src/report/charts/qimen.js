@@ -46,17 +46,17 @@ const CSS = `
 .qm2{--ink:#2f2a22;--sub:#8b8172;--gold:#b0812b;--line:#e3d9c4;--sep:#f1ead9;--red:#b3392c;
   max-width:760px;margin:0 auto;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",sans-serif;font-size:13px}
 .qm2 *{box-sizing:border-box}
-.qm2 .hd{position:relative;background:linear-gradient(180deg,#fffdf8,#fbf5e9);border:1px solid var(--line);border-radius:12px 12px 0 0;padding:12px 14px;text-align:center}
-.qm2 .hd .t{font-family:"Noto Serif SC",serif;font-size:20px;font-weight:700;letter-spacing:4px;margin-right:-4px;color:#2c2418}
-.qm2 .hd .b{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 9px;margin-top:7px;font-size:11.5px;color:#6d6353}
-.qm2 .hd .b i{font-style:normal;background:#f7f2e7;border:1px solid var(--line);border-radius:5px;padding:2px 7px;transition:.14s}
+.qm2 .hd{position:relative;background:linear-gradient(180deg,#fffdf8,#fbf5e9);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:center;margin:0 12px 8px}
+.qm2 .hd .t{font-family:"Noto Serif SC",serif;font-size:19px;font-weight:700;letter-spacing:3px;color:#2c2418}
+.qm2 .hd .b{display:flex;flex-wrap:wrap;justify-content:center;gap:5px 7px;margin-top:6px;font-size:11px;color:#6d6353}
+.qm2 .hd .b i{font-style:normal;background:#f7f2e7;border:1px solid var(--line);border-radius:5px;padding:1.5px 6px;transition:.14s}
 .qm2 .hd .b i.qm-el:hover{border-color:var(--gold);background:#fdf3dd}
 .qm2 .hd .b i b{color:#3b332a;font-weight:600}
-.qm2 .hd-stems{position:absolute;top:8px;right:12px;font-size:11px;color:#6d6353;text-align:right;line-height:1.5}
+.qm2 .hd-stems{margin-top:4px;font-size:11.5px;color:#6d6353;text-align:center;line-height:1.4}
 .qm2 .hd-stems .lab{color:#9b8f77;margin-right:3px}
 .qm2 .hd-stems b{font-family:"Noto Serif SC",serif;font-size:14px;font-weight:800;margin:0 1px}
 .qm2 .hd-stems .sgap{color:#c9bda3;margin:0 1px}
-.qm2 .sz{display:grid;grid-template-columns:56px repeat(4,1fr);border:1px solid var(--line);border-radius:0 0 10px 10px;border-top:0;overflow:hidden;margin:0 12px 10px;background:#fffdf8}
+.qm2 .sz{display:grid;grid-template-columns:56px repeat(4,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:0 12px 10px;background:#fffdf8}
 .qm2 .sz>div{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 4px;border-bottom:1px solid #f2ecdd;font-size:12px;min-width:0}
 .qm2 .sz>div:nth-child(-n+5){background:#fbf6ea}
 .qm2 .sz .k{font-size:12.5px;color:#b0812b;letter-spacing:2px;text-indent:2px;border-right:1px solid #efe8d8}
@@ -134,14 +134,20 @@ const CSS = `
 .qm-pop .t{font-weight:700;color:#e7c878;margin-bottom:3px;font-size:13px;letter-spacing:1px}
 .qm-pop .x{white-space:pre-line}
 .qm-pop .cls{display:block;margin-top:6px;font-size:10.5px;color:#a99e88}
-@media (max-width:560px){.qm2 .qp{--rh:20px;--rs:24px;--rt:24px;--rd:28px;--fs:15px;--fs-name:11.5px;--fs-tag:8.5px;height:184px}
-  .qm2 .g9{gap:6px;padding:2px 8px 10px}
-  .qm2 .sz{grid-template-columns:42px repeat(4,1fr);margin:0 8px 8px}
-  .qm2 .sz .gan,.qm2 .sz .zhi{font-size:21px;padding:0 4px}
-  .qm2 .hd-stems b{font-size:13px}.qm-pop{max-width:260px}
-  .qm2 .qgan{padding-left:10px}}
-@media (max-width:420px){.qm2 .qp{--rh:18px;--rs:22px;--rt:22px;--rd:26px;--fs:14px;--fs-name:11px;--fs-tag:8px;height:172px}
-  .qm2 .g9{gap:4px;padding:2px 5px 8px}
+@media (max-width:560px){
+  .qm2 .hd{margin:0 6px 6px;padding:8px 8px}
+  .qm2 .hd .t{font-size:17px;letter-spacing:2px}
+  .qm2 .hd .b{gap:4px 5px;margin-top:5px;font-size:10.5px}
+  .qm2 .hd .b i{padding:1px 5px}
+  .qm2 .qp{--rh:18px;--rs:21px;--rt:21px;--rd:24px;--fs:14px;--fs-name:11px;--fs-tag:8px;height:150px;padding:4px 5px}
+  .qm2 .qg{gap:4px}
+  .qm2 .g9{gap:5px;padding:2px 6px 8px}
+  .qm2 .sz{grid-template-columns:42px repeat(4,1fr);margin:0 6px 8px}
+  .qm2 .sz .gan,.qm2 .sz .zhi{font-size:19px;padding:0 4px}
+  .qm2 .hd-stems b{font-size:12.5px}.qm-pop{max-width:260px}
+  .qm2 .qgan{padding-left:6px}}
+@media (max-width:420px){.qm2 .qp{--rh:17px;--rs:19px;--rt:19px;--rd:22px;--fs:13.5px;--fs-name:10.5px;--fs-tag:7.5px;height:142px}
+  .qm2 .g9{gap:4px;padding:2px 4px 8px}
   .qm2 .sz{grid-template-columns:36px repeat(4,1fr)}.qm2 .sz .gan,.qm2 .sz .zhi{font-size:18px;padding:0 2px}
   .qm2 .sz .k{font-size:11px;letter-spacing:0;text-indent:0}
   .qm2 .hd .t{font-size:17px;letter-spacing:2px;margin-right:-2px}.qm2 .meth i{font-size:10px;padding:2px 6px}
@@ -333,13 +339,13 @@ export function renderQimen(f) {
   return `<style class="qm2-style">${CSS}</style><div class="qm2">
     <div class="hd">
       <div class="t">${esc(f.juName)}</div>
+      <div class="hd-stems"><span class="lab">四柱干支：</span>${fp.year ? esc(fp.year.name + "  " + fp.month.name + "  " + fp.day.name + "  " + fp.hour.name) : ""}　<span class="lab">四干</span>${fpStems}</div>
       <div class="b">${headRow}</div>
-      <div class="hd-stems"><span class="lab">四干</span>${fpStems}</div>
     </div>
-    ${szTable}
-    ${methChips}
     <div class="g9">${cells}</div>
     ${legend}
+    ${methChips}
+    ${szTable}
     <div class="ft">
       <div class="adv">
         <div><b>用神</b> ${esc(f.purpose ? f.purpose.name : '通用')}：${esc(f.purpose ? f.purpose.note : '')}</div>

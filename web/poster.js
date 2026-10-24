@@ -964,53 +964,48 @@
 
     var cfgMap = {
       bazi: {
-        seal: '☯ 四柱八字 · 子平真太阳时起盘台',
+        seal: '☯ 八字真太阳时起盘台',
         meta: '节气交脱分秒定局 · 110项古籍神煞 · 六柱岁运同参',
         chips: [
-          { act: 'now', label: '⚡ 此刻时辰起盘' },
-          { act: 'male', label: '👨 经典乾造命例' },
-          { act: 'female', label: '👩 经典坤造命例' },
-          { act: 'alm', label: '📅 今日黄历宜忌' },
+          { act: 'now', label: '⚡ 此刻起盘' },
+          { act: 'male', label: '👨 乾造示例' },
+          { act: 'female', label: '👩 坤造示例' },
         ],
       },
       ziwei: {
-        seal: '✦ 紫微斗数 · 文墨天机全星起盘台',
-        meta: '108颗星曜竖排成列 · 十二宫本宫自化与向心四化 · 博士长生三神叠列',
+        seal: '✦ 紫微斗数 · 文墨起盘台',
+        meta: '108星竖排成列 · 十二宫自化与向心四化 · 博士长生三神叠列',
         chips: [
-          { act: 'now', label: '⚡ 此刻时辰排盘' },
-          { act: 'male', label: '👨 紫贪格男命例' },
-          { act: 'female', label: '👩 机月同梁女命例' },
-          { act: 'alm', label: '📅 今日黄历宜忌' },
+          { act: 'now', label: '⚡ 此刻排盘' },
+          { act: 'male', label: '👨 紫贪男命' },
+          { act: 'female', label: '👩 机月女命' },
         ],
       },
       liuyao: {
-        seal: '䷀ 六爻纳甲 · 京房易占演卦台',
-        meta: '时间 / 报数 / 铜钱 / 手动 / 卦名五法齐备 · 旺相休囚死与应期直断',
+        seal: '䷀ 六爻京房纳甲起卦台',
+        meta: '时间 / 报数 / 铜钱 / 手动 / 卦名五法齐备 · 月建日辰纲领',
         chips: [
-          { act: 'ly-now', label: '⚡ 此刻正时起卦' },
-          { act: 'ly-auto', label: '🎲 随机铜钱演卦' },
-          { act: 'ly-num', label: '🔢 梅花报数示例' },
-          { act: 'alm', label: '📅 今日黄历宜忌' },
+          { act: 'ly-now', label: '⚡ 正时起卦' },
+          { act: 'ly-auto', label: '🎲 随机摇卦' },
+          { act: 'ly-num', label: '🔢 报数示例' },
         ],
       },
       qimen: {
-        seal: '☷ 奇门遁甲 · 时家转飞起局台',
-        meta: '拆补 / 置闰 / 茅山三法定局 · 二十余种吉凶克应格局自动推演',
+        seal: '☷ 奇门遁甲时家起局台',
+        meta: '拆补 / 置闰 / 茅山三法定局 · 二十余种吉凶克应格局推演',
         chips: [
-          { act: 'qm-now', label: '⚡ 此刻正时起局' },
-          { act: 'qm-career', label: '💼 事业求财局例' },
-          { act: 'qm-love', label: '❤️ 婚恋感情局例' },
-          { act: 'alm', label: '📅 今日黄历宜忌' },
+          { act: 'qm-now', label: '⚡ 正时起局' },
+          { act: 'qm-career', label: '💼 事业求财' },
+          { act: 'qm-love', label: '❤️ 婚恋感情' },
         ],
       },
       hepan: {
-        seal: '囍 八字合婚 · 双人命局同参台',
-        meta: '天干五合 · 地支六合三合刑冲 · 日柱夫妻宫配合 · 六维契合度雷达',
+        seal: '囍 八字合婚双人同参台',
+        meta: '天干五合 · 地支六合三合刑冲 · 夫妻宫十神 · 六维契合雷达',
         chips: [
-          { act: 'hp-demo1', label: '💑 天作之合命例' },
-          { act: 'hp-demo2', label: '🔥 互补磨合命例' },
-          { act: 'hp-swap', label: '🔄 甲乙双方互换' },
-          { act: 'alm', label: '📅 婚嫁择日黄历' },
+          { act: 'hp-demo1', label: '💑 良缘示例' },
+          { act: 'hp-demo2', label: '🔥 磨合示例' },
+          { act: 'hp-swap', label: '🔄 甲乙互换' },
         ],
       },
     };
@@ -1030,6 +1025,7 @@
         cfg.chips.map(function (c) {
           return '<button type="button" class="fbq-chip" data-qact="' + esc(c.act) + '">' + esc(c.label) + '</button>';
         }).join('') +
+        '<button type="button" class="fbq-chip fbq-fold" data-qact="fold" title="收起起盘表单">▲ 收起</button>' +
       '</div>';
 
     fbCard.insertBefore(qbar, fbCard.firstChild);
@@ -1055,6 +1051,13 @@
       var btn = e.target.closest ? e.target.closest('button[data-qact]') : null;
       if (!btn) return;
       var act = btn.getAttribute('data-qact');
+      if (act === 'fold') {
+        var fb = document.querySelector('.formbar');
+        if (fb) fb.classList.add('is-collapsed');
+        var exp = document.getElementById('btnExpandForm');
+        if (exp) exp.textContent = '展开修改';
+        return;
+      }
       if (act === 'alm') {
         openAlmanacModal();
         return;
