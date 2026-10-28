@@ -1,12 +1,12 @@
 /**
- * 六爻卦象 —— 热卜（移动端）版式 · 专业实测精修版 v2.5
+ * 六爻卦象 —— 热卜（移动端）版式 · 36神煞全表精修版 v2.7
  *
  * 结构（自上而下）：
- *  ① 占断信息表  事项/日期/卦式/节气/干支四柱（对标热卜：月柱、日柱天干地支整柱标红，年时柱墨黑）/空亡
- *  ② 神煞区      热卜式严格 4 列对齐网格（名称--地支，合并贵人、剔除杂乱后缀）+ 右上角「收起/展开」开关
+ *  ① 占断信息表  事项/日期/卦式/节气/干支四柱（天干墨黑，仅月支、日支标红）/空亡
+ *  ② 神煞区      热卜式严格 4 列对齐网格（36 项全套神煞：含香闺、床帐、世身、胎爻、天马、生气、死气、游都、飞符等）+ 右上角「收起/展开」开关
  *  ③ 卦象区      智能区分【静卦】与【动变之卦】：
  *               - 静卦（无动爻且本变同卦）：对标热卜，居中仅展示单一本卦（五列：六兽｜六亲｜纳甲｜爻画｜世应），绝不重复渲染两个相同卦！
- *               - 动变卦（有动爻或指定变卦）：热卜式八列左右并排（本卦 + 变卦），动爻朱砂红醒目高亮。
+ *               - 动变卦（有动爻或指定变卦）：热卜式八列左右并排（本卦 + 变卦），爻画与地支墨黑，仅中间动爻符号 0→ / X→ 标红。
  */
 
 import { esc, list } from './shared.js';
@@ -18,7 +18,7 @@ const SHEN_CHAR = { 青龙: '龙', 朱雀: '雀', 勾陈: '勾', 螣蛇: '蛇', 
 
 const METHOD_NAME = {
   time: '时间起卦', number: '两数起卦', number2: '三数起卦',
-  coin: '在线摇卦', manual: '手动指定', name: '卦名起卦', auto: '自动起卦',
+  coin: '摇卦（铜钱）', manual: '手动指定', name: '卦名起卦', auto: '自动起卦',
 };
 
 const CSS = `
@@ -154,16 +154,27 @@ const fmtJd = (jd) => {
 };
 
 /**
- * 规整六爻神煞为热卜式整齐短标签（合并贵人、剔除冗余「（年）」与爻位尾巴，严格 4 列对齐）
+ * 热卜标准 36 项六爻神煞排列序（严格 4 列 × 9 行对齐：包含香闺、世身、胎爻、床帐、天马、生气、死气、游都、飞符、血支、死神等）
  */
+const SHENSHA_ORDER = [
+  '卦身', '驿马', '桃花', '日禄',
+  '月德', '灾煞', '劫煞', '贵人',
+  '天医', '文昌', '将星', '华盖',
+  '香闺', '世身', '胎爻', '床帐',
+  '羊刃', '天马', '生气', '死气',
+  '亡神', '病符', '丧门', '吊客',
+  '破碎', '游都', '飞符', '血支',
+  '孤辰', '寡宿', '官符', '死神',
+  '天德', '谋星', '红鸾', '天喜',
+];
+
 function buildCleanShenshaList(f) {
-  const out = [];
+  const map = new Map();
   if (f.guaShen?.zhi) {
-    out.push({ name: '卦身', val: f.guaShen.zhi, inGua: true, tip: f.guaShen.source || '卦身' });
+    map.set('卦身', { name: '卦身', val: f.guaShen.zhi, inGua: true, tip: f.guaShen.source || '卦身' });
   }
   const raw = list(f.shensha);
   const guirenZhis = [];
-  const seen = new Set(['卦身']);
 
   const SHORT_NAME = {
     天乙贵人: '贵人',
@@ -172,7 +183,6 @@ function buildCleanShenshaList(f) {
 
   for (const s of raw) {
     if (!s || !s.name) continue;
-    // 跳过带（年）的重复项，保持和热卜一致的清爽单锚展示
     if (s.name.includes('（年）') || s.name.includes('(年)')) continue;
     const target = s.zhi || s.gan || '';
     if (!target) continue;
@@ -181,9 +191,8 @@ function buildCleanShenshaList(f) {
       continue;
     }
     const cleanName = SHORT_NAME[s.name] || s.name;
-    if (seen.has(cleanName)) continue;
-    seen.add(cleanName);
-    out.push({
+    if (map.has(cleanName)) continue;
+    map.set(cleanName, {
       name: cleanName,
       val: target,
       inGua: s.lineIndex !== null && s.lineIndex !== undefined,
@@ -192,14 +201,22 @@ function buildCleanShenshaList(f) {
   }
 
   if (guirenZhis.length) {
-    // 将合并后的「贵人--寅午」插入在前排常用位
-    out.splice(Math.min(7, out.length), 0, {
+    map.set('贵人', {
       name: '贵人',
       val: guirenZhis.join(''),
       inGua: false,
       tip: '天乙贵人：甲戊庚牛羊，乙己鼠猴乡，丙丁猪鸡位，壬癸兔蛇藏，六辛逢马虎',
     });
   }
+
+  const out = [];
+  for (const key of SHENSHA_ORDER) {
+    if (map.has(key)) {
+      out.push(map.get(key));
+      map.delete(key);
+    }
+  }
+  for (const item of map.values()) out.push(item);
   return out;
 }
 
@@ -244,7 +261,6 @@ export function renderLiuyao(f) {
   // —— ② 神煞区（严格 4 列网格 + 右上角收起/展开按钮） ——
   const cleanSs = buildCleanShenshaList(f);
   const ssCells = cleanSs.map((s, idx) => {
-    // 第一行第 4 列右侧附带「收起」按钮（对标热卜版式）
     if (idx === 3) {
       return `<span class="ss-item${s.inGua ? ' in' : ''}" title="${esc(s.tip)}" style="display:flex;align-items:center;justify-content:space-between">
         <span><b>${esc(s.name)}</b>--${esc(s.val)}</span>
@@ -269,7 +285,6 @@ export function renderLiuyao(f) {
   let guaBlock = '';
 
   if (isStaticGua) {
-    // 静卦：对标热卜，居中仅展示一个本卦！
     guaHead = `<div class="ghd single">
       <div class="gt single">${esc(ben.name)}<i>(${esc(ben.gong || '')}${genTag(ben.generation)})</i></div>
     </div>`;
@@ -284,7 +299,7 @@ export function renderLiuyao(f) {
         l.yuePo ? '破' : '',
         l.xunkong ? '空' : '',
       ].filter(Boolean);
-      const mark = marks.map((m) => `<i class="${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
+      const mark = marks.map((m) => `<i class="ymk ${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
       const shiYingTag = l.isShi ? '<i class="ltag">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : '');
       return `<div class="${cls}">
         <div class="ls">${esc(SHEN_CHAR[l.liushen] || '—')}</div>
@@ -298,7 +313,6 @@ export function renderLiuyao(f) {
     }).join('');
     guaBlock = `<div class="lrows single">${singleRows}</div>`;
   } else {
-    // 动变之卦：左右并排展示本卦与变卦
     guaHead = `<div class="ghd">
       <div class="gt b">${esc(ben.name)}<i>(${esc(ben.gong || '')}${genTag(ben.generation)})</i></div>
       <div class="gt y">${esc(bian.name)}${esc(bian.gong || '') ? `<i>(${esc(bian.gong || '')}${genTag(bian.generation)})</i>` : ''}</div>
@@ -314,7 +328,7 @@ export function renderLiuyao(f) {
         l.yuePo ? '破' : '',
         l.xunkong ? '空' : '',
       ].filter(Boolean);
-      const mark = marks.map((m) => `<i class="${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
+      const mark = marks.map((m) => `<i class="ymk ${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
       const mid = l.isDong
         ? `<i class="lmk">${y ? '0' : 'X'}→</i>`
         : (l.isShi ? '<i class="ltag">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : ''));
@@ -337,7 +351,7 @@ export function renderLiuyao(f) {
     guaBlock = `<div class="lrows">${dualRows}</div>`;
   }
 
-  // —— 卦辞解释（静卦仅显示本卦卦辞，有变卦才显示本/变切换 Tab） ——
+  // —— 卦辞解释 ——
   const gcPane = (name, cls, labId, checked) => {
     const gc = guaciOf(name) || { guaCi: '（暂无卦辞）', xiang: '', duan: '' };
     return `<input type="radio" name="gcTab" id="${labId}"${checked ? ' checked' : ''}>

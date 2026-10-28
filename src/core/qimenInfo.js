@@ -13,9 +13,9 @@ export const CHANG12 = ['长生', '沐浴', '冠带', '临官', '帝旺', '衰',
 const GAN_LS_ZHI = { 0: 9, 2: 2, 4: 2, 6: 5, 8: 8, 1: 6, 3: 9, 5: 9, 7: 0, 9: 3 };
 const GAN_YANG = [true, false, true, false, true, false, true, false, true, false];
 
-/** 天盘干在某宫（取宫首地支）的十二长生状态名 */
+/** 天盘干在某宫（取宫首墓库/正位地支）的十二长生状态名 */
 export function changshengOf(ganIndex, zhiIndex) {
-  if (ganIndex === undefined || ganIndex === null || zhiIndex === undefined || zhiIndex === null) return '';
+  if (ganIndex === undefined || ganIndex === null || zhiIndex === undefined || zhiIndex === null || ganIndex < 0 || zhiIndex < 0) return '';
   const ls = GAN_LS_ZHI[((ganIndex % 10) + 10) % 10];
   if (ls === undefined) return '';
   const diff = GAN_YANG[ganIndex % 10]
@@ -29,8 +29,14 @@ export function changshengOf(ganIndex, zhiIndex) {
 /** 六仪击刑：天盘干 → 所刑之宫（甲子戊刑卯震三、甲戌己刑未坤二、甲申庚刑寅艮八、甲午辛自刑离九、甲辰壬自刑巽四、甲寅癸刑巳巽四） */
 export const JI_XING = { 戊: 3, 己: 2, 庚: 8, 辛: 9, 壬: 4, 癸: 4 };
 
-/** 入墓：天盘干 → 落墓库之宫（木墓未坤二、火墓戌乾六、金墓丑艮八、水墓辰巽四、土随火墓戌） */
-export const RU_MU = { 乙: 2, 丙: 6, 丁: 6, 戊: 6, 己: 6, 庚: 8, 辛: 8, 壬: 4, 癸: 4 };
+/**
+ * 入墓：天盘干 → 落墓库之宫（与十干阴阳顺逆十二长生「墓」位严格一致）
+ * - 乙（阴木长生在午，逆行墓在戌）、丙（阳火墓在戌）、戊（阳土墓在戌） → 乾六宫（戌亥）
+ * - 丁（阴火长生在酉，逆行墓在丑）、己（阴土墓在丑）、庚（阳金墓在丑） → 艮八宫（丑寅）
+ * - 辛（阴金长生在子，逆行墓在辰）、壬（阳水墓在辰） → 巽四宫（辰巳）
+ * - 癸（阴水长生在卯，逆行墓在未） → 坤二宫（未申）
+ */
+export const RU_MU = { 乙: 6, 丙: 6, 戊: 6, 丁: 8, 己: 8, 庚: 8, 辛: 4, 壬: 4, 癸: 2 };
 
 /** 八门五行 */
 export const DOOR_WX = { 休门: '水', 生门: '土', 伤门: '木', 杜门: '木', 景门: '火', 死门: '土', 惊门: '金', 开门: '金' };
@@ -48,7 +54,7 @@ export function isMenPo(door, palaceId) {
 /** 四害解释文本 */
 export const SIHAI_INFO = {
   击刑: '六仪击刑：天盘六仪落在刑伤之宫，仪干自伤其力。谋事遇之不宜强进，防刑伤、官非、器械之损；吉事减力，凶事更凶。',
-  入墓: '三奇入墓：天盘干落于墓库之宫，力量被封藏于内。有才难施、有财难发之象，宜蛰伏等待时机，不宜强求。',
+  入墓: '奇仪入墓：天盘干（或天盘寄干）落于十二长生墓库之宫，力量被封藏于内。有才难施、有财难发之象，宜蛰伏等待时机，不宜强求。',
   门迫: '门迫：八门五行克所落之宫，门气受损。吉门被迫则吉事减半，凶门被迫则凶势更张，动作宜缓。',
   空亡: '空亡：宫位地支落入旬空，有名无实、其力减半。所谋之事易落空、延迟，宜反复确认、稳中求进。',
 };
@@ -60,7 +66,7 @@ export const STAR_INFO = {
   天芮: { wx: '土', good: false, text: '土星，为“病星”，亦为学生之星。主疾病、师友结交。宜求学拜师、结交朋友，不宜求医问病、嫁娶远行。' },
   天冲: { wx: '木', good: true, text: '木星，为“行动之星”。主雷厉风行、慈心济物。宜开拓竞争、快速推进、征讨之事，不宜守财敛财。' },
   天辅: { wx: '木', good: true, text: '木星，为“文曲文昌”。主文化教育、考试升迁，大吉之星。宜读书考试、著书立说、婚嫁出行。' },
-  天禽: { wx: '土', good: true, text: '土星居中宫，为人中正厚道。主厚重信义，百事皆宜，尤利公务、合作、营造。寄坤二宫时随坤宫论。' },
+  天禽: { wx: '土', good: true, text: '土星居中宫，为人中正厚道。主厚重信义，百事皆宜，尤利公务、合作、营造。转盘奇门随寄宫（常寄坤二宫随天芮、或阳寄艮八阴寄坤二）同行，携带中五宫之干作为寄干。' },
   天心: { wx: '金', good: true, text: '金星，为“天医”，亦为领导核心之星。主医药、决断、应变。宜求医治病、上任领导、谋大事。' },
   天柱: { wx: '金', good: false, text: '金星，为“破军”，主口舌词讼、破坏隐伏。宜守御自固、据理力争，不宜外出谋事、签约合作。' },
   天任: { wx: '土', good: true, text: '土星，为“富星”。主稳重担当、实业根基。宜立坚果业、婚娶置产、开办实业，不利快进快出。' },
@@ -225,8 +231,6 @@ const HOME_DOOR = { 1: '休门', 2: '死门', 3: '伤门', 4: '杜门', 6: '开�
 
 /**
  * 自动识别奇门遁甲九宫与全局吉凶格局（20+ 经典格）
- * @param {{ palaces: Array, riGan: string, shiGan: string, shiGanzhi: string, zhiShiPalace: number, zhiFuPalace: number }} ctx
- * @returns {{ byPalace: Record<number, Array<{name:string,type:'吉'|'凶',desc:string}>>, all: Array<{name:string,type:'吉'|'凶',palace:number|null,palaceName:string,desc:string}> }}
  */
 export function detectQimenPatterns(ctx) {
   const { palaces = [], riGan = '', shiGan = '', shiGanzhi = '' } = ctx;

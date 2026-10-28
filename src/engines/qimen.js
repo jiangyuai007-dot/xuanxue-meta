@@ -1,5 +1,5 @@
 /**
- * 奇门遁甲排盘引擎 —— 时家奇门 · 转盘/飞盘 · 拆补法/置闰法/茅山法（Phase 2 专业升级版）
+ * 奇门遁甲排盘引擎 —— 时家奇门 · 转盘/飞盘 · 拆补法/置闰法/茅山法（v2.8 对标热卜标准转盘环序+寄干+暗干精修版）
  * 确定性排盘，只产事实；吉凶评价为规则化打分，非绝对断言。
  */
 
@@ -22,20 +22,17 @@ export const JU_TABLE = {
 };
 
 const PALACE_NAME = { 1: '坎', 2: '坤', 3: '震', 4: '巽', 5: '中', 6: '乾', 7: '兑', 8: '艮', 9: '离' };
-const PALACE_ZHI = { 1: ['子'], 2: ['未', '申'], 3: ['卯'], 4: ['辰', '巳'], 5: [], 6: ['戌', '亥'], 7: ['酉'], 8: ['丑', '寅'], 9: ['午'] };
+const PALACE_ZHI = { 1: ['子'], 2: ['未', '申'], 3: ['卯'], 4: ['辰', '巳'], 5: ['辰', '戌', '丑', '未'], 6: ['戌', '亥'], 7: ['酉'], 8: ['丑', '寅'], 9: ['午'] };
 const PALACE_DIR = { 1: '北', 2: '西南', 3: '东', 4: '东南', 5: '中央', 6: '西北', 7: '西', 8: '东北', 9: '南' };
 
 const YI = ['戊', '己', '庚', '辛', '壬', '癸']; // 六仪（对应六旬首）
 const DI_SEQ = ['戊', '己', '庚', '辛', '壬', '癸', '丁', '丙', '乙']; // 三奇六仪排布序
 
 const STAR_HOME = { 1: '天蓬', 2: '天芮', 3: '天冲', 4: '天辅', 5: '天禽', 6: '天心', 7: '天柱', 8: '天任', 9: '天英' };
-const STAR_ORDER = ['天蓬', '天芮', '天冲', '天辅', '天心', '天柱', '天任', '天英'];
-const STAR_HOME8 = [1, 2, 3, 4, 6, 7, 8, 9];
 /** 飞盘九星序（按洛书 1..9 本宫星名排列，中五天禽独立参飞） */
 const FEI_STAR_ORDER = ['天蓬', '天芮', '天冲', '天辅', '天禽', '天心', '天柱', '天任', '天英'];
 
 const DOOR_HOME = { 1: '休门', 2: '死门', 3: '伤门', 4: '杜门', 5: null, 6: '开门', 7: '惊门', 8: '生门', 9: '景门' };
-const DOOR_ORDER = ['休门', '生门', '伤门', '杜门', '景门', '死门', '惊门', '开门'];
 /** 飞盘八门序（按洛书八宫 1,2,3,4,6,7,8,9 本位门排列） */
 const FEI_DOOR_ORDER = ['休门', '死门', '伤门', '杜门', '开门', '惊门', '生门', '景门'];
 
@@ -49,6 +46,8 @@ const GOOD_SHEN = ['值符', '太阴', '六合', '九地', '九天'];
 
 const SEQ9 = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const SEQ8 = [1, 2, 3, 4, 6, 7, 8, 9];
+/** 转盘奇门顺时针外圈八宫环序：坎1 → 艮8 → 震3 → 巽4 → 离9 → 坤2 → 兑7 → 乾6 */
+const RING8 = [1, 8, 3, 4, 9, 2, 7, 6];
 
 function rotate(seq, start, forward, steps = seq.length) {
   const i0 = seq.indexOf(start);
@@ -117,7 +116,7 @@ export function computeQimen(input) {
   const hourGzIndex = indexOfGanzhi(hourGanIndex, hourZhiIndex);
   const hourGz = { gan: GAN[hourGanIndex], zhi: ZHI[hourZhiIndex], name: GAN[hourGanIndex] + ZHI[hourZhiIndex], index: hourGzIndex };
 
-  // Phase 2 精进：三元与局数 —— 严格区分 拆补法 / 真置闰法（正授·超神·接气·芒种大雪置闰） / 茅山法 / 自选局数
+  // 三元与局数 —— 严格区分 拆补法 / 真置闰法 / 茅山法 / 自选局数
   const juMethod = input.juMethod || 'chaibu';
   const fuTouIndex = Math.floor(riGz.index / 5) * 5;
   const fuTouName = GAN[fuTouIndex % 10] + ZHI[fuTouIndex % 12];
@@ -127,21 +126,18 @@ export function computeQimen(input) {
   let yuanBasis = `拆补法：日柱${riGz.name}，符头${fuTouName}，三元顺推`;
 
   if (juMethod === 'zhirun') {
-    // 置闰法：以甲子(0)、己卯(15)、甲午(30)、己酉(45) 四大符头为上元首日（index % 15 === 0）
     const tzOffset = dt.tzOffset ?? 8;
     const termDayNumber = Math.floor(curTerm.jdUtc + tzOffset / 24 + 0.5);
     const termDayGz = ganzhiOfJdn(termDayNumber);
-    const termCycleOffset = termDayGz.index % 15; // 交节当日距最近大符头的天数 (0..14)
-    const cycleOffset = riGz.index % 15;          // 当前日距最近大符头的天数 (0..14)
+    const termCycleOffset = termDayGz.index % 15;
+    const cycleOffset = riGz.index % 15;
     const shangYuanDay = dayNumber - cycleOffset;
     const shangYuanGz = ganzhiOfJdn(shangYuanDay);
     yuanIdx = Math.floor(cycleOffset / 5);
 
-    // 交节与上元大符头的日差：正值=超神（符头先至），0=正授，负值=接气（节气先至）
     const diffDays = termDayNumber - shangYuanDay;
     let state = '正授';
     let isLeapYuan = false;
-    // 芒种(index=8) 或 大雪(index=20) 超神满 9 日及以上时，置闰叠用上一节气（小满=7 / 小雪=19）三元
     if ((curTerm.index === 8 || curTerm.index === 20) && termCycleOffset >= 9 && (dayNumber - (termDayNumber - termCycleOffset)) < 15) {
       effectiveTermIdx = curTerm.index - 1;
       state = '置闰';
@@ -220,85 +216,97 @@ export function computeQimen(input) {
 
   // 中宫寄宫：寄坤二宫 / 阳遁寄艮八、阴遁寄坤二
   const jiGong = input.jiGong === 'yangGenYinKun' ? (isYang ? 8 : 2) : 2;
-  const jiGongName = input.jiGong === 'yangGenYinKun' ? `阳${isYang ? '遁寄艮八' : '阴遁寄坤二'}` : '寄坤二宫';
+  const jiGongName = input.jiGong === 'yangGenYinKun' ? `${isYang ? '阳遁寄艮八' : '阴遁寄坤二'}` : '寄坤二宫';
   const vfPalace8 = vfPalace === 5 ? jiGong : vfPalace;
   const sgPalace8 = sgPalace === 5 ? jiGong : sgPalace;
 
-  // 时支宫（值使门落宫）
+  // 值使门随时宫：从旬首宫 vfPalace 起甲，按阳顺阴逆沿洛书九宫数至当前时辰（hourSteps = hourGzIndex - xunShouIdx）
   const hourZhi = ZHI[hourZhiIndex];
-  let hourZhiPalace = 1;
-  for (const p of SEQ8) {
-    if (PALACE_ZHI[p].includes(hourZhi)) {
-      hourZhiPalace = p;
-      break;
-    }
-  }
+  const hourSteps = ((hourGzIndex - xunShouIdx) % 10 + 10) % 10;
+  const zhiShiSeq = rotate(SEQ9, vfPalace, forward, hourSteps + 1);
+  const hourZhiPalaceRaw = zhiShiSeq[hourSteps];
+  const hourZhiPalace = hourZhiPalaceRaw === 5 ? jiGong : hourZhiPalaceRaw;
   const zhiShiDoorHome = DOOR_HOME[vfPalace8];
 
   const tianPan = {};
   const tianStar = {};
   const tianDoor = {};
   const tianShen = {};
+  // 中五宫寄宫的天盘寄干（随天禽/寄宫主星同行）与地盘寄干（落于寄宫）
+  const tianJiGan = {};
+  const diJiGan = {};
+  const jiStarAt = {};
 
   if (isFeiPan) {
-    // —— Phase 2：飞盘奇门（九宫洛书顺逆飞布） ——
-    // 1. 天盘三奇六仪：从值符六仪 yi 起于时干落宫 sgPalace，按阳顺阴逆沿洛书九宫飞布
+    // —— 飞盘奇门（九宫洛书顺逆飞布） ——
     const yiIdx = DI_SEQ.indexOf(yi);
     const feiSeq9 = rotate(SEQ9, sgPalace, forward, 9);
     feiSeq9.forEach((p, k) => {
       tianPan[p] = DI_SEQ[(yiIdx + k) % 9];
     });
-    // 2. 天盘九星：九星（含天禽）从值符星 STAR_HOME[vfPalace] 起于时干落宫 sgPalace，按阳顺阴逆沿九宫飞布
     const vfStarName = STAR_HOME[vfPalace];
     const vfStarIdx = FEI_STAR_ORDER.indexOf(vfStarName);
     feiSeq9.forEach((p, k) => {
       tianStar[p] = FEI_STAR_ORDER[(vfStarIdx + (forward ? k : -k) + 9) % 9];
     });
-    // 3. 天盘八门：从值使门 zhiShiDoorHome 起于时支宫 hourZhiPalace，按阳顺阴逆沿八宫 SEQ8 飞布
     const zsDoorIdx = FEI_DOOR_ORDER.indexOf(zhiShiDoorHome);
     const feiDoorSeq8 = rotate(SEQ8, hourZhiPalace, forward, 8);
     feiDoorSeq8.forEach((p, k) => {
       tianDoor[p] = FEI_DOOR_ORDER[(zsDoorIdx + (forward ? k : -k) + 8) % 8];
     });
-    // 4. 八神：从值符起于 sgPalace8，按阳顺阴逆沿 SEQ8 飞布
     const shenList = isYang ? SHEN_YANG : SHEN_YIN;
     const shenSeq = rotate(SEQ8, sgPalace8, forward, 8);
     shenSeq.forEach((p, i) => {
       tianShen[p] = shenList[i];
     });
   } else {
-    // —— 转盘奇门（保持原有精确逻辑） ——
-    const offset = stepsBetween(SEQ9, vfPalace, sgPalace, forward);
-    for (const p of SEQ9) {
-      const n = SEQ9.length;
-      const i = SEQ9.indexOf(p);
-      const back = SEQ9[(((i - (forward ? offset : -offset)) % n) + n) % n];
-      tianPan[p] = diPan[back];
-    }
-
-    const zhiFuStarHome = STAR_HOME[vfPalace] === '天禽' ? '天芮' : STAR_HOME[vfPalace];
-    const starOffset = stepsBetween(SEQ8, STAR_HOME8[STAR_ORDER.indexOf(zhiFuStarHome)], sgPalace8, forward);
-    SEQ8.forEach((p) => {
-      const n = SEQ8.length;
-      const i = SEQ8.indexOf(p);
-      const back = SEQ8[(((i - (forward ? starOffset : -starOffset)) % n) + n) % n];
+    // —— 转盘奇门（严格沿顺时针外圈八宫环 RING8 = [1, 8, 3, 4, 9, 2, 7, 6] 旋转，与热卜/传统转盘完全一致） ——
+    // 1. 九星与天盘三奇六仪（星随符转，干随星转，天禽与中五宫之干随寄宫主星同行）
+    const starOffset = stepsBetween(RING8, vfPalace8, sgPalace8, true);
+    RING8.forEach((p, i) => {
+      const back = RING8[((i - starOffset) % 8 + 8) % 8];
       tianStar[p] = STAR_HOME[back];
+      if (back === jiGong) {
+        jiStarAt[p] = '天禽';
+        // 若旬首在中五宫（vfPalace === 5），主天盘干取旬首仪 diPan[5]，寄干取 diPan[jiGong]；否则主干取 diPan[jiGong]，寄干取 diPan[5]
+        if (vfPalace === 5) {
+          tianPan[p] = diPan[5];
+          tianJiGan[p] = diPan[jiGong];
+        } else {
+          tianPan[p] = diPan[jiGong];
+          tianJiGan[p] = diPan[5];
+        }
+      } else {
+        tianPan[p] = diPan[back];
+      }
     });
 
-    const doorOffset = stepsBetween(SEQ8, vfPalace8, hourZhiPalace, forward);
-    SEQ8.forEach((p) => {
-      const n = SEQ8.length;
-      const i = SEQ8.indexOf(p);
-      const back = SEQ8[(((i - (forward ? doorOffset : -doorOffset)) % n) + n) % n];
+    // 2. 地盘寄干：中五宫地盘之干（diPan[5]）寄于 jiGong（坤二宫或艮八宫）地盘
+    diJiGan[jiGong] = diPan[5];
+
+    // 3. 八门转盘：值使门落于 hourZhiPalace，其余各门沿顺时针八宫环 RING8 依次顺布
+    const doorOffset = stepsBetween(RING8, vfPalace8, hourZhiPalace, true);
+    RING8.forEach((p, i) => {
+      const back = RING8[((i - doorOffset) % 8 + 8) % 8];
       tianDoor[p] = DOOR_HOME[back];
     });
 
+    // 4. 八神转盘：值符起于 sgPalace8，沿外圈八宫环 RING8 阳遁顺时针、阴遁逆时针排布
     const shenList = isYang ? SHEN_YANG : SHEN_YIN;
-    const shenSeq = rotate(SEQ8, sgPalace8, forward, 8);
+    const shenSeq = rotate(RING8, sgPalace8, forward, 8);
     shenSeq.forEach((p, i) => {
       tianShen[p] = shenList[i];
     });
   }
+
+  // —— 九宫暗干（隐干）：时干入值使门落宫（若与该宫地盘干伏吟则入中五宫），按阳顺阴逆沿洛书九宫飞布 ——
+  const anGan = {};
+  const anStartPalace = diPan[hourZhiPalace] === shiGanName ? 5 : hourZhiPalace;
+  const anStartIdx = Math.max(0, DI_SEQ.indexOf(shiGanName));
+  const anSeq9 = rotate(SEQ9, anStartPalace, forward, 9);
+  anSeq9.forEach((p, k) => {
+    anGan[p] = DI_SEQ[(anStartIdx + k) % 9];
+  });
 
   // 空亡与马星
   const kongWangZhi = xunkongOf(hourGzIndex).map((i) => ZHI[i]);
@@ -320,16 +328,7 @@ export function computeQimen(input) {
     const gan = p.gan === '甲' ? YI[Math.floor(p.index / 10)] : p.gan;
     return { label, gan };
   });
-  const tianMarks = {};
-  const diMarks = {};
-  for (const p of SEQ9) tianMarks[p] = [];
-  for (const p of SEQ9) diMarks[p] = [];
-  for (const m of markGans) {
-    for (const p of SEQ9) {
-      if (tianPan[p] === m.gan) tianMarks[p].push(m.label);
-      if (diPan[p] === m.gan) diMarks[p].push(m.label);
-    }
-  }
+  const marksForGan = (g) => (g ? markGans.filter((m) => m.gan === g).map((m) => m.label) : []);
 
   const palaces = SEQ9.map((p) => {
     const isMid = p === 5;
@@ -337,19 +336,36 @@ export function computeQimen(input) {
     const kw = isMid ? false : zhiList.some((z) => kongWangZhi.includes(z));
     const dkw = isMid ? false : zhiList.some((z) => dayKongWang.includes(z));
     const tian = isMid ? (isFeiPan ? tianPan[5] : null) : tianPan[p];
+    const tianJi = !isMid ? (tianJiGan[p] || null) : null;
+    const diJi = !isMid ? (diJiGan[p] || null) : null;
     const door = isMid ? null : tianDoor[p];
     const tianIdx = tian ? GAN.indexOf(tian) : -1;
     const cs = tian && !isMid ? changshengOf(tianIdx, ZHI.indexOf(zhiList[0])) : '';
+    const tianJiIdx = tianJi ? GAN.indexOf(tianJi) : -1;
+    const tianJiCs = tianJi && !isMid ? changshengOf(tianJiIdx, ZHI.indexOf(zhiList[0])) : '';
+    const zhiCanggan = isMid
+      ? ['戊', '己']
+      : zhiList.map((z) => (CANGGAN[z] || [])[0]).filter(Boolean);
+    const isTianRuMu = !isMid && RU_MU[tian] === p;
+    const isJiRuMu = !isMid && !!tianJi && RU_MU[tianJi] === p;
     return {
       id: p,
       name: PALACE_NAME[p],
       direction: PALACE_DIR[p],
       zhi: zhiList,
+      zhiCanggan,
+      anGan: anGan[p] || null,
       isMiddle: isMid,
+      isJiGong: p === jiGong,
+      jiGongTarget: isMid ? PALACE_NAME[jiGong] : null,
       diPan: diPan[p],
+      diJiGan: diJi,
       tianPan: tian,
+      tianJiGan: tianJi,
+      tianJiCs,
       star: isMid ? (isFeiPan ? tianStar[5] : '天禽') : tianStar[p],
-      starExtra: !isFeiPan && p === 2 ? '（天禽寄坤）' : '',
+      jiStar: jiStarAt[p] || null,
+      starExtra: !isFeiPan && jiStarAt[p] ? '（天禽同宫）' : (!isFeiPan && p === jiGong ? `（中五寄${PALACE_NAME[jiGong]}）` : ''),
       door,
       shen: isMid ? null : tianShen[p],
       kongWang: kw,
@@ -357,21 +373,24 @@ export function computeQimen(input) {
       maXing: p === maPalace,
       isZhiFu: p === sgPalace8,
       isZhiShi: p === hourZhiPalace,
-      // —— 四害 ——
-      jiXing: !isMid && !!JI_XING[tian] && JI_XING[tian] === p,
-      ruMu: !isMid && RU_MU[tian] === p,
+      // —— 四害（入墓与十二长生严格同步） ——
+      jiXing: !isMid && (JI_XING[tian] === p || (!!tianJi && JI_XING[tianJi] === p)),
+      ruMu: isTianRuMu || isJiRuMu,
+      ruMuGan: isTianRuMu ? tian : (isJiRuMu ? tianJi : null),
       menPo: !isMid && isMenPo(door, p),
       // —— 天盘干十二长生（取宫首地支） ——
       changsheng: cs,
       changshengNote: cs ? CHANG12_INFO[cs] || '' : '',
       // —— 年月日时干标记 ——
-      tianMarks: tianMarks[p],
-      diMarks: diMarks[p],
+      tianMarks: marksForGan(tian),
+      tianJiMarks: marksForGan(tianJi),
+      diMarks: marksForGan(diPan[p]),
+      diJiMarks: marksForGan(diJi),
       patterns: [],
     };
   });
 
-  // Phase 2 新增：自动识别 20+ 奇门经典吉凶格局，并挂载到各宫与全局
+  // 自动识别 20+ 奇门经典吉凶格局，并挂载到各宫与全局
   const patternResult = detectQimenPatterns({
     palaces,
     riGan: riGz.gan,
@@ -454,7 +473,7 @@ export function computeQimen(input) {
     nextTerm: nextTerm ? { name: nextTerm.name, jdUtc: nextTerm.jdUtc } : null,
     xunShou: xunShouName,
     xunShouYi: yi,
-    zhiFu: { star: STAR_HOME[vfPalace], palace: sgPalace8, palaceName: PALACE_NAME[sgPalace8], midNote: sgPalace === 5 ? '时干落中宫，寄坤宫论' : null },
+    zhiFu: { star: STAR_HOME[vfPalace], palace: sgPalace8, palaceName: PALACE_NAME[sgPalace8], midNote: sgPalace === 5 ? `时干落中宫，${jiGongName}论` : null },
     zhiShi: { door: zhiShiDoorHome, palace: hourZhiPalace, palaceName: PALACE_NAME[hourZhiPalace] },
     palaces,
     patterns: patternResult.all,

@@ -1,10 +1,11 @@
 /**
- * 奇门遁甲九宫盘 —— 天干地支五行着色 + 星门神纯墨 + 九宫单宫无横线清爽版 v2.6
+ * 奇门遁甲九宫盘 —— 对标热卜布局（暗干居左 + 芮禽寄干双显 + 天干地支五行着色 + 星门神纯墨 + 无横线清爽版）v2.8
  *
  * 视觉规范：
- *   1. 天干地支（四柱干支、藏干、顶栏四干、九宫天盘干与地盘干）恢复传统五行颜色（木绿/火红/土褐/金黄/水蓝）；
- *   2. 九宫格内的「八神、九星、八门」保持统一浓墨色（#1f1a14），主次分明、不杂乱；
- *   3. 九宫格单宫内部去掉所有横向分割线（.qr / .qg 无 border-top），宫面通透干净。
+ *   1. 天干地支（四柱干支、藏干、顶栏四干、九宫暗干、天盘干/寄干、地盘干/寄干）均采用传统五行颜色；
+ *   2. 九宫格内的「八神、九星（含芮禽）、八门」保持统一浓墨色（#1f1a14），主次分明；
+ *   3. 每宫九星左侧清晰展示本宫「暗干（隐干）」，天芮天禽同宫显示「芮禽」与寄干（如丁戊），寄宫地盘同步显示寄干（如丁戊）；
+ *   4. 九宫格单宫内部去掉所有横向分割线（.qr / .qg 无 border-top），宫面通透干净。
  */
 
 import { esc, list, WX_COLOR } from './shared.js';
@@ -14,7 +15,7 @@ import {
 } from '../../core/qimenInfo.js';
 
 const elColor = (e) => WX_COLOR[e] || '#1f1a14';
-const PALACE_WX = { 1: '水', 2: '土', 3: '木', 4: '木', 6: '金', 7: '金', 8: '土', 9: '火' };
+const PALACE_WX = { 1: '水', 2: '土', 3: '木', 4: '木', 5: '土', 6: '金', 7: '金', 8: '土', 9: '火' };
 const ZHI_EL = { 子: '水', 丑: '土', 寅: '木', 卯: '木', 辰: '土', 巳: '火', 午: '火', 未: '土', 申: '金', 酉: '金', 戌: '土', 亥: '水' };
 
 const ZHI_INFO = {
@@ -78,7 +79,7 @@ const CSS = `
 .qm2 .meth i b{color:var(--ink)}
 /* 九宫格：单宫去掉内部横线（.qr / .qg 无 border-top），天干五行着色，八神九星八门统一浓墨色 */
 .qm2 .g9{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:2px 12px 12px}
-.qm2 .qp{--rh:22px;--rs:26px;--rt:26px;--rd:30px;
+.qm2 .qp{--rh:22px;--rs:25px;--rt:26px;--rd:28px;
   --fs:16.5px;--fs-name:12px;--fs-tag:9px;
   position:relative;height:200px;
   display:grid;grid-template-rows:var(--rh) var(--rs) var(--rt) 1fr var(--rd);
@@ -86,7 +87,7 @@ const CSS = `
 .qm2 .qp.mid{background:#f8f4ea;border-style:dashed}
 .qm2 .qp.vf{box-shadow:0 0 0 2px var(--gold);border-color:var(--gold)}
 .qm2 .qp.shi{background:#fffcf2}
-.qm2 .qr{display:flex;align-items:center;justify-content:center;min-width:0;border-top:none}
+.qm2 .qr{display:flex;align-items:center;justify-content:center;min-width:0;border-top:none;position:relative}
 .qm2 .qel{cursor:pointer;border-radius:6px;display:inline-flex;align-items:center;justify-content:center}
 .qm2 .qh{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden}
 .qm2 .qn{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:3px;white-space:nowrap;overflow:hidden}
@@ -109,6 +110,18 @@ const CSS = `
   white-space:nowrap;
   color:var(--ink) !important;
 }
+/* 暗干（隐干）：对标热卜，置于九星行左侧（中五宫亦置于左侧） */
+.qm2 .qangan{
+  position:absolute;
+  left:10px;
+  top:50%;
+  transform:translateY(-50%);
+  font-family:"Noto Serif SC",serif;
+  font-size:15px;
+  font-weight:700;
+  line-height:1;
+  opacity:0.82;
+}
 .qm2 .qgan b{
   font-family:"Noto Serif SC",serif;
   font-size:var(--fs);
@@ -116,12 +129,18 @@ const CSS = `
   line-height:1;
   white-space:nowrap;
 }
+.qm2 .qgan b.jigan{
+  font-size:15.5px;
+  margin-right:1px;
+}
 .qm2 .qdoor-row{display:flex;align-items:center;justify-content:flex-end;padding-right:12px}
 .qm2 .qd{position:relative;line-height:1}
-.qm2 .qg{display:flex;flex-direction:column;justify-content:center;gap:10px;min-width:0;border-top:none}
-.qm2 .qgan{display:flex;align-items:center;justify-content:flex-start;gap:5px;padding-left:14px;min-width:0}
+.qm2 .qg{display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:0;border-top:none}
+.qm2 .qgan-line{display:flex;align-items:center;justify-content:flex-start;gap:4px;padding-left:10px;min-width:0;flex-wrap:nowrap}
+.qm2 .qgan{display:inline-flex;align-items:center;justify-content:flex-start;gap:3px;min-width:0}
 .qm2 .qdash{font-size:var(--fs);color:#b8ad98;line-height:1}
 .qm2 .mk,.qm2 .qcs,.qm2 .qpat{font-style:normal;text-decoration:none;font-size:9.5px;line-height:1.45;border-radius:3px;padding:0 3px;white-space:nowrap;flex:0 0 auto;color:#5c4e38;background:#f4ede0;border:1px solid #dfd3bc}
+.qm2 .mk.ji{background:#efe5d0;color:#7a5820;border-color:#d8c49e}
 .qm2 .qpo{position:absolute;right:100%;margin-right:3px;top:50%;transform:translateY(-50%);
   font-style:normal;font-size:9px;color:#fff;background:#8c3b2b;border-radius:3px;padding:0 3px;line-height:1.5;font-weight:600;white-space:nowrap}
 .qm2 .lg{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;margin:0 12px 10px;font-size:11px;color:#7a6f5d}
@@ -154,21 +173,25 @@ const CSS = `
   .qm2 .sz .xk{font-size:12px;letter-spacing:1px}
   .qm2 .meth{margin:0 6px 6px;gap:4px}
   .qm2 .meth i{font-size:10.5px;padding:1px 5px}
-  .qm2 .qp{--rh:18px;--rs:21px;--rt:21px;--rd:23px;--fs:15px;--fs-name:11.5px;--fs-tag:8px;height:150px;padding:4px 5px}
+  .qm2 .qp{--rh:18px;--rs:20px;--rt:21px;--rd:22px;--fs:14.5px;--fs-name:11.5px;--fs-tag:8px;height:152px;padding:4px 5px}
   .qm2 .qg{gap:3px}
   .qm2 .g9{gap:5px;padding:2px 6px 8px}
   .qm2 .hd-stems b{font-size:12.5px}.qm-pop{max-width:260px}
-  .qm2 .qgan{padding-left:6px}
+  .qm2 .qgan-line{padding-left:6px;gap:2px}
+  .qm2 .qgan b.jigan{font-size:13.5px}
+  .qm2 .qangan{left:6px;font-size:13px}
+  .qm2 .qdoor-row{padding-right:6px}
 }
 @media (max-width:420px){
-  .qm2 .qp{--rh:17px;--rs:20px;--rt:20px;--rd:22px;--fs:14.5px;--fs-name:11px;--fs-tag:7.5px;height:146px}
+  .qm2 .qp{--rh:17px;--rs:19px;--rt:20px;--rd:21px;--fs:14px;--fs-name:11px;--fs-tag:7.5px;height:146px}
   .qm2 .g9{gap:4px;padding:2px 4px 8px}
   .qm2 .sz{grid-template-columns:38px repeat(4,1fr)}
   .qm2 .sz .gan,.qm2 .sz .zhi{font-size:18.5px;padding:0 1px}
   .qm2 .sz .k{font-size:11.5px;letter-spacing:0;text-indent:0}
-  .qm2 .mk,.qm2 .qcs,.qm2 .qpo,.qm2 .qpat{font-size:8.5px;padding:0 2px}
+  .qm2 .mk,.qm2 .qcs,.qm2 .qpo,.qm2 .qpat{font-size:8px;padding:0 2px}
   .qm2 .qtag i{width:13px;height:13px}
-  .qm2 .qgan{padding-left:8px;gap:3px}
+  .qm2 .qgan-line{padding-left:4px;gap:2px}
+  .qm2 .qangan{left:4px;font-size:12.5px}
 }
 `;
 
@@ -182,6 +205,16 @@ const markHtml = (marks) => (list(marks).length
   ? `<i class="mk qm-el" data-t="年月日时干标记：${esc(list(marks).join(''))}" data-x="该干与本局四柱的年干/月干/日干/时干相同，称为「同干」，常用于定位用神宫与事应时间。">${esc(list(marks).join(''))}</i>`
   : '');
 
+function renderAnGan(p) {
+  if (!p.anGan) return '';
+  return el(
+    `${p.name}宫暗干（隐干）「${p.anGan}」`,
+    `${GAN_INFO[p.anGan]?.text || ''}\n起法：时干入值使门落宫（若与地盘干同则入中五宫），按阳顺阴逆沿洛书九宫飞布。暗干主隐藏之人事机兆。`,
+    `<span style="color:${elColor(GAN_INFO[p.anGan]?.wx)}">${esc(p.anGan)}</span>`,
+    'qangan'
+  );
+}
+
 export function renderQimen(f) {
   const find = (id) => list(f.palaces).find((p) => p.id === id);
 
@@ -189,6 +222,7 @@ export function renderQimen(f) {
     const p = find(id);
     if (!p) return '<div class="qp"></div>';
 
+    const ruMuGanName = p.ruMuGan || p.tianPan || '';
     const tagDefs = [];
     if (p.isZhiFu) tagDefs.push(['v', '符', '值符宫', HEAD_INFO.值符]);
     if (p.isZhiShi) tagDefs.push(['v', '使', '值使宫', HEAD_INFO.值使]);
@@ -196,7 +230,7 @@ export function renderQimen(f) {
     if (p.dayKongWang) tagDefs.push(['d', '日', '日空亡', '日柱旬空落此宫，同主力量减弱，其应稍缓。']);
     if (p.maXing) tagDefs.push(['m', HORSE_SVG, '驿马星', HEAD_INFO.马星]);
     if (p.jiXing) tagDefs.push(['x', '刑', `六仪击刑（${p.tianPan || ''}落${p.name || ''}宫）`, SIHAI_INFO.击刑]);
-    if (p.ruMu) tagDefs.push(['x', '墓', `三奇入墓（${p.tianPan || ''}入${p.name || ''}宫墓库）`, SIHAI_INFO.入墓]);
+    if (p.ruMu) tagDefs.push(['x', '墓', `奇仪入墓（${ruMuGanName}入${p.name || ''}宫墓库）`, SIHAI_INFO.入墓]);
     if (p.menPo) tagDefs.push(['p', '迫', `门迫（${p.door || ''}属${DOOR_WX[p.door] || ''}克${p.name || ''}宫${PALACE_WX[p.id]}）`, SIHAI_INFO.门迫]);
     const tags = tagDefs.map(([cls, label, t, x]) =>
       `<i class="qm-el ${cls}" data-t="${esc(t)}" data-x="${esc(x)}" title="${esc(t)}">${label}</i>`).join('');
@@ -205,7 +239,7 @@ export function renderQimen(f) {
     if (p.kongWang) sihaiTexts.push(['空亡', SIHAI_INFO.空亡]);
     if (p.dayKongWang) sihaiTexts.push(['日空亡', '日柱旬空落此宫，同主力量减弱，其应稍缓。']);
     if (p.jiXing) sihaiTexts.push([`击刑（${p.tianPan}落${p.name}宫）`, SIHAI_INFO.击刑]);
-    if (p.ruMu) sihaiTexts.push([`入墓（${p.tianPan}入${p.name}宫墓库）`, SIHAI_INFO.入墓]);
+    if (p.ruMu) sihaiTexts.push([`入墓（${ruMuGanName}入${p.name}宫墓库）`, SIHAI_INFO.入墓]);
     if (p.menPo) sihaiTexts.push([`门迫（${p.door}属${DOOR_WX[p.door]}克${p.name}宫${PALACE_WX[p.id]}）`, SIHAI_INFO.门迫]);
 
     const starInfo = STAR_INFO[p.star] || {};
@@ -217,28 +251,29 @@ export function renderQimen(f) {
     const csInfo = p.changsheng ? `${p.changsheng}｜${CHANG12_INFO[p.changsheng] || ''}` : '';
 
     const palaceWx = PALACE_WX[p.id];
-    const headTitle = `${p.id}·${p.name}宫（${p.direction}）　地支：${esc(list(p.zhi).join('、'))}`;
+    const headTitle = `${p.id}·${p.name}宫（${p.direction}）　地支：${esc(list(p.zhi).join('、'))}　暗干：${esc(p.anGan || '—')}`;
     const headText = `坎一、坤二、震三、巽四、中五、乾六、兑七、艮八、离九——洛书九宫配后天八卦，${p.name}宫属${palaceWx}，居${p.direction}方。${sihaiTexts.length ? '　本宫标记：' + sihaiTexts.map(([t]) => t).join('、') : ''}${patSummary ? '　本宫格局：' + patSummary : ''}`;
 
     if (p.isMiddle) {
+      const midTarget = p.jiGongTarget || '坤';
       const midTian = p.tianPan
         ? el(`中宫天盘干「${esc(p.tianPan)}」`, `${GAN_INFO[p.tianPan]?.text || ''}　飞盘奇门中五宫天盘之干。`,
             `<b style="color:${elColor(GAN_INFO[p.tianPan]?.wx || '')}">${esc(p.tianPan)}</b>${markHtml(p.tianMarks)}`, 'qgan ti')
-        : el('中宫无天盘干', '转盘奇门中五宫不参与天盘旋转，寄宫论。', '<span class="qdash">—</span>', 'qgan ti');
+        : el('中宫天盘随寄', `转盘奇门中五宫天禽星与天干「${p.diPan || ''}」随寄于${midTarget}宫。`, '<span class="qdash">—</span>', 'qgan ti');
       return `<div class="qp mid${p.isZhiFu ? ' vf' : ''}${p.isZhiShi ? ' shi' : ''}">
         <div class="qh">${el('5·中宫（太极中枢）',
-          '中五宫无卦无地支，转盘奇门天禽星寄坤二宫，飞盘奇门九星飞入中宫。',
-          `<span class="qn"><i class="id">5</i><span class="pn">中</span><span class="dir">中宫</span></span>`)}
+          `中五宫属中央戊己土，转盘奇门天禽星与地盘干「${p.diPan || ''}」寄于${midTarget}宫；左侧为中宫暗干「${p.anGan || ''}」。`,
+          `<span class="qn"><i class="id">5</i><span class="pn">中</span><span class="dir">寄${esc(midTarget)}</span></span>`)}
           <span class="qtag">${tags}</span></div>
-        <div class="qr">${el('中宫无八神', '中五宫不入八神排布。', '<span class="qdash">—</span>')}</div>
-        <div class="qr">${el(`九星「${esc(p.star || '天禽')}」`, `${starInfo.text || '天禽星：中宫之主星，五行属土。'}`,
+        <div class="qr">${el('中宫八神', `中五宫随${midTarget}宫论八神。`, '<span class="qdash">—</span>')}</div>
+        <div class="qr">${renderAnGan(p)}${el(`九星「${esc(p.star || '天禽')}」`, `${starInfo.text || '天禽星：中宫之主星，五行属土。'}`,
           `<span class="qstar">${esc(p.star || '天禽')}</span>`)}</div>
         <div class="qg">
-          ${midTian}
-          ${el(`中宫地盘干「${esc(p.diPan || '—')}」`, `${GAN_INFO[p.diPan]?.text || ''}　中五宫地盘之干。`,
-            `<b style="color:${elColor(GAN_INFO[p.diPan]?.wx || '')}">${esc(p.diPan || '—')}</b>${markHtml(p.diMarks)}`, 'qgan di')}
+          <div class="qgan-line">${midTian}</div>
+          <div class="qgan-line">${el(`中宫地盘干「${esc(p.diPan || '—')}」（寄${midTarget}宫）`, `${GAN_INFO[p.diPan]?.text || ''}　中五宫地盘之干，转盘寄于${midTarget}宫。`,
+            `<b style="color:${elColor(GAN_INFO[p.diPan]?.wx || '')}">${esc(p.diPan || '—')}</b>${markHtml(p.diMarks)}`, 'qgan di')}</div>
         </div>
-        <div class="qr qdoor-row">${el('中宫无八门', '中五宫不入八门排布。', '<span class="qdash">—</span>')}</div>
+        <div class="qr qdoor-row">${el('中宫无八门', '中五宫不入八门排布。', '<span class="qdash qd">—</span>')}</div>
       </div>`;
     }
 
@@ -246,6 +281,21 @@ export function renderQimen(f) {
     const patBadge = firstPat
       ? `<u class="qpat ${firstPat.type === '吉' ? 'good' : 'bad'} qm-el" data-t="格局「${esc(firstPat.name)}」（${esc(firstPat.type)}）" data-x="${esc(firstPat.desc)}">${esc(firstPat.name.slice(0, 4))}</u>`
       : '';
+
+    // 天盘寄干（对标热卜：天芮天禽同宫时，展示「丁戊」双干，寄干在前或并列）
+    const tianJiPrefix = (p.tianJiGan && p.tianJiGan !== p.tianPan)
+      ? `<b class="jigan" style="color:${elColor(GAN_INFO[p.tianJiGan]?.wx || '')}" title="中五天禽随寄天盘干：${esc(p.tianJiGan)}">${esc(p.tianJiGan)}</b>`
+      : '';
+
+    // 地盘寄干（对标热卜：寄宫如坤二宫地盘展示「丁戊」双干）
+    const diJiPrefix = (p.diJiGan && p.diJiGan !== p.diPan)
+      ? `<b class="jigan" style="color:${elColor(GAN_INFO[p.diJiGan]?.wx || '')}" title="中五宫寄${esc(p.name)}宫地盘干：${esc(p.diJiGan)}">${esc(p.diJiGan)}</b>`
+      : '';
+
+    // 对标热卜：天芮与天禽同宫简写为「芮禽」（天任与天禽同宫简写为「任禽」）
+    const starDispName = p.jiStar
+      ? (p.star === '天芮' ? '芮禽' : p.star === '天任' ? '任禽' : `${p.star}·禽`)
+      : (p.star || '—');
 
     return `<div class="qp${p.kongWang ? ' kw' : ''}${p.isZhiFu ? ' vf' : ''}${p.isZhiShi ? ' shi' : ''}">
       <div class="qh">
@@ -255,17 +305,25 @@ export function renderQimen(f) {
       </div>
       <div class="qr">${el(`八神「${esc(p.shen || '—')}」`, shenInfo.text || '',
         esc(p.shen || '—'), 'qs')}</div>
-      <div class="qr">${el(`九星「${esc(p.star || '—')}」`, `${starInfo.text || ''}${csInfo ? `　〔落宫状态〕${csInfo}` : ''}`,
-        `<span>${esc(p.star || '—')}</span>`, 'qstar')}</div>
+      <div class="qr">${renderAnGan(p)}${el(`九星「${esc(p.star || '—')}${p.jiStar ? '·天禽' : ''}」`, `${starInfo.text || ''}${p.jiStar ? '\n〔天禽同宫〕中五宫天禽星随寄本宫，故合称「' + starDispName + '」。' : ''}${csInfo ? `　〔落宫状态〕${csInfo}` : ''}`,
+        `<span>${esc(starDispName)}</span>`, 'qstar')}</div>
       <div class="qg">
-        ${el(`天盘干「${esc(p.tianPan || '—')}」加${esc(p.name)}宫`, tianText,
-          `<b style="color:${elColor(GAN_INFO[p.tianPan]?.wx || '')}">${esc(p.tianPan || '—')}</b>`
-          + markHtml(p.tianMarks)
-          + (p.changsheng ? `<u class="qcs qm-el" data-t="十二长生「${esc(p.changsheng)}」" data-x="${esc(p.changsheng)}：${esc(CHANG12_INFO[p.changsheng] || '')}（以天盘干对本宫地支而言）">${esc(p.changsheng)}</u>` : ''),
-          'qgan ti')}
-        ${el(`地盘干「${esc(p.diPan || '—')}」（${esc(p.name)}宫原始之干）`, GAN_INFO[p.diPan]?.text || '',
-          `<b style="color:${elColor(GAN_INFO[p.diPan]?.wx || '')}">${esc(p.diPan || '—')}</b>` + markHtml(p.diMarks) + patBadge,
-          'qgan di')}
+        <div class="qgan-line">
+          ${el(`天盘干「${esc(p.tianJiGan ? `${p.tianJiGan}${p.tianPan}` : (p.tianPan || '—'))}」加${esc(p.name)}宫`, tianText + (p.tianJiGan ? `\n〔中五寄干〕天禽携「${p.tianJiGan}」同落${p.name}宫（长生：${p.tianJiCs || '—'}）。` : ''),
+            tianJiPrefix
+            + `<b style="color:${elColor(GAN_INFO[p.tianPan]?.wx || '')}">${esc(p.tianPan || '—')}</b>`
+            + markHtml(p.tianMarks)
+            + (p.changsheng ? `<u class="qcs qm-el" data-t="十二长生「${esc(p.changsheng)}」" data-x="${esc(p.changsheng)}：${esc(CHANG12_INFO[p.changsheng] || '')}（以天盘干对本宫地支而言）">${esc(p.changsheng)}</u>` : ''),
+            'qgan ti')}
+        </div>
+        <div class="qgan-line">
+          ${el(`地盘干「${esc(p.diJiGan ? `${p.diJiGan}${p.diPan}` : (p.diPan || '—'))}」（${esc(p.name)}宫地盘之干）`, (GAN_INFO[p.diPan]?.text || '') + (p.diJiGan ? `\n〔中五寄干〕中五宫之「${p.diJiGan}」寄于${p.name}宫地盘。` : ''),
+            diJiPrefix
+            + `<b style="color:${elColor(GAN_INFO[p.diPan]?.wx || '')}">${esc(p.diPan || '—')}</b>`
+            + markHtml(p.diMarks)
+            + patBadge,
+            'qgan di')}
+        </div>
       </div>
       <div class="qr qdoor-row">${el(`八门「${esc(p.door || '—')}」`, `${doorInfo.text || ''}${p.menPo ? '　〔当前门迫，力量受损〕' : ''}`,
         `<span>${esc(p.door || '—')}</span>${p.menPo ? '<i class="qpo">迫</i>' : ''}`, 'qd')}</div>
@@ -335,7 +393,7 @@ export function renderQimen(f) {
     <span><i class="d">日</i>日旬空亡</span>
     <span><i class="m">${HORSE_SVG}</i>驿马星</span>
     <span><i class="x">刑</i>六仪击刑</span>
-    <span><i class="x">墓</i>三奇入墓</span>
+    <span><i class="x">墓</i>奇仪入墓</span>
     <span><i class="p">迫</i>门迫</span>
   </div>`;
 
@@ -364,7 +422,7 @@ export function renderQimen(f) {
         <div><b>吉方</b> ${esc(fav.palaceName || '—')}宫（${esc(fav.direction || '—')}方）· ${esc(fav.door || '—')} · ${esc(fav.star || '—')}　评分 ${fav.score ?? '—'}</div>
         ${patBarHtml}
         ${top ? `<div class="why">次选：${esc(top)}</div>` : ''}
-        <div class="why">盘面读法：每宫自上而下为 宫位头 → 八神 → 九星 → 天盘干／地盘干（居左，上天下地）→ 八门（右下）；宫内任一符号均可点击查看解释。</div>
+        <div class="why">盘面读法：每宫自上而下为 宫位头 → 八神 → 暗干（左）＋九星（中，天芮天禽同宫作「芮禽」） → 天盘干／地盘干（含中五寄干，如丁戊） → 八门（右下）；任一符号可点击查看解释。</div>
       </div>
     </div>
   </div>`;
