@@ -30,7 +30,7 @@ export function qimenChapters(f) {
   const kongPalaces = palaces.filter((p) => p.kongWang);
 
   // ---------------- 免费：盘式概览
-  const overview = `本次起局：${f.juName}，${f.yuan}（${f.yuanBasis}），节气为${f.solarTerm}，${f.panType}。`
+  const overview = `${f.question ? `所问事项：「${f.question}」（${f.purpose?.name || '通用'}）。` : ''}本次起局：${f.juName}，${f.yuan}（${f.yuanBasis}），节气为${f.solarTerm}，${f.panType}。`
     + `${f.jiGongName ? `${f.jiGongName}。` : ''}`
     + `日柱${f.pillars.ri.ganzhi}，时柱${f.pillars.shi.ganzhi}，旬首${f.xunShou}（${f.xunShouYi}）。`
     + `值符为${zf.star}，落于${zf.palaceName}宫${zf.midNote ? `（${zf.midNote}）` : ''}——值符是这一局的「主事者」，所落之宫即是全局的重心；`

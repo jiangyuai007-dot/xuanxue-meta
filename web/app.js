@@ -116,6 +116,14 @@ function applyProfile(id) {
   if (i.guaName) { set('guaName', i.guaName); set('bianGuaName', i.bianGuaName || i.guaName); }
   if (i.question !== undefined) set('question', i.question);
   if (i.purpose) set('purpose', i.purpose);
+  if (i.panType) set('panType', i.panType);
+  if (i.jiGong) set('jiGong', i.jiGong);
+  if (i.juMethod) {
+    set('juMethod', i.juMethod);
+    if ($('customJuWrap')) $('customJuWrap').style.display = i.juMethod === 'custom' ? 'inline-flex' : 'none';
+  }
+  if (i.customJu) set('customJu', i.customJu);
+  if (i.customYinYang) set('customYinYang', i.customYinYang);
   syncMethodUi();
   msg('已载入档案，正在排盘…');
   runPaipan();
@@ -519,6 +527,7 @@ function collectInput() {
       base.bianGuaName = ($('hasBianGua') && $('hasBianGua').checked) ? (val('bianGuaName', '') || base.guaName) : base.guaName;
     }
   } else if (CURRENT_SYS === 'qimen') {
+    base.question = val('question', '');
     base.purpose = val('purpose', 'general');
     base.panType = val('panType', 'zhuan');
     base.jiGong = val('jiGong', 'kun2');
@@ -616,7 +625,7 @@ function showResultHead(facts, system) {
     sub = `${facts.benGua.gong}宫 ${facts.benGua.gongElement}`;
   } else if (system === 'qimen') {
     main = `${facts.juName}　${facts.yuan}`;
-    sub = `值符 ${facts.zhiFu.star}　值使 ${facts.zhiShi.door}`;
+    sub = `${facts.question ? `所问：${facts.question}　` : ''}值符 ${facts.zhiFu.star}　值使 ${facts.zhiShi.door}`;
   }
   head.innerHTML = `<div><div class="rh-main">${main}</div><div class="rh-sub">${sub}</div></div><span class="rh-tag">已排盘</span>`;
   head.style.display = '';

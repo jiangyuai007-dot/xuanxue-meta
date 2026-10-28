@@ -68,11 +68,15 @@ function stepsBetween(seq, a, b, forward) {
 const MA_XING = { 寅: '申', 午: '申', 戌: '申', 申: '寅', 子: '寅', 辰: '寅', 巳: '亥', 酉: '亥', 丑: '亥', 亥: '巳', 卯: '巳', 未: '巳' };
 
 const PURPOSE = {
-  wealth: { name: '求财', doors: ['生门'], note: '求财以生门为主用神，兼看戊（资本）与日干宫' },
-  career: { name: '事业谋职', doors: ['开门'], note: '事业以开门为用神，兼看年干宫与日干宫' },
-  travel: { name: '出行', doors: ['开门', '生门'], note: '出行以开门、生门方位为宜，忌死门、伤门方' },
-  negotiate: { name: '谈判合作', doors: ['开门'], note: '谈判以开门、值符为用，兼看六合（和合）' },
-  general: { name: '通用', doors: ['开门', '休门', '生门'], note: '通用看日干宫、时干宫与三吉门方位' },
+  wealth: { name: '求财经营', doors: ['生门'], note: '求财以生门为主用神，兼看甲子戊（资本）与日干、时干生克' },
+  career: { name: '事业谋职', doors: ['开门'], note: '事业以开门为用神，兼看年干（上级）、值符与日干宫' },
+  relationship: { name: '婚恋感情', doors: ['休门'], note: '婚恋以乙奇（女方）、庚（男方）、六合（媒合）与日干宫合参' },
+  negotiate: { name: '谈判合作', doors: ['开门', '休门'], note: '谈判合作以开门、值使门、六合及日干（我方）与时干（对方）落宫合参' },
+  study: { name: '学业考试', doors: ['景门'], note: '学业考试以天辅星、景门（试卷）、丁奇（文章）与日干宫合参' },
+  health: { name: '健康求医', doors: ['生门', '休门'], note: '问病求医以天芮星为病神、天心星与乙奇为医药，兼看生死二门' },
+  travel: { name: '出行远行', doors: ['开门', '生门'], note: '出行以开门、生门、九天方位为宜，兼看日干宫与马星动向' },
+  lost: { name: '失物寻人', doors: ['杜门', '伤门'], note: '失物寻人以时干落宫定去向，兼看玄武、天蓬与值使门确定找回时机' },
+  general: { name: '通用', doors: ['开门', '休门', '生门'], note: '通用看日干宫（求测人）、时干宫（所问之事）与三吉门方位' },
 };
 
 /**
@@ -459,6 +463,7 @@ export function computeQimen(input) {
   const best = targetPalaces.length ? targetPalaces[0] : ranked[0];
 
   return {
+    question: String(input.question || '').trim(),
     panType: isYang ? '阳遁' : '阴遁',
     panMethod: isFeiPan ? 'fei' : 'zhuan',
     ju,

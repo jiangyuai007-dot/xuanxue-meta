@@ -9,11 +9,15 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<link rel="stylesheet" href="style.css?v=20261028v27">
+<link rel="stylesheet" href="style.css?v=20261028v29">
 <link rel="stylesheet" href="fonts/subset.css">
 <style id="xj-v23-guard">
 .formbar:not(.is-collapsed) .form-summary-bar{display:none!important}
 .formbar.is-collapsed #msg:not(.err){display:none!important}
+#row-question{flex:1 1 280px}
+#row-question .fb-ctl{display:flex;align-items:center;gap:6px;width:100%}
+#row-question #question{flex:1 1 180px;min-width:140px}
+#row-question #purpose{flex:0 0 auto;width:auto;min-width:96px}
 @media (max-width:820px){
   .topbar{padding:8px 12px!important;flex-wrap:nowrap!important;gap:8px!important}
   .top-status #svcDot:not(.down)+#svcTxt{display:none!important}
@@ -27,6 +31,7 @@
   .fb-ctl{min-height:34px!important;gap:4px!important}
   .fb-row select,.fb-row input[type=text],.fb-row input[type=number]{height:34px!important;font-size:13px!important;padding:0 5px!important}#city,#aCity,#bCity{width:80px!important}.chk,.leap{min-height:34px!important;font-size:12px!important;gap:2px!important;padding:0!important}input[type=checkbox]{width:24px!important;height:24px!important;background-size:16px 16px!important}
   .fb-row#row-datetime,.hp-party .fb-row:nth-child(3){flex:0 0 100%!important;width:100%!important;order:10!important}
+  .fb-row#row-question{flex:0 0 100%!important;width:100%!important;order:11!important}
   .date-grid{display:grid!important;grid-template-columns:minmax(48px,1.45fr) auto minmax(32px,1fr) auto minmax(32px,1fr) auto minmax(32px,1fr) auto minmax(32px,1fr) auto!important;width:100%!important;gap:2px!important;align-items:center!important}
   .date-grid input[type=number]{width:100%!important;min-width:0!important;padding:0 2px!important;font-size:14px!important;height:34px!important}
   .date-grid span{font-size:11.5px!important;margin:0!important}
@@ -41,7 +46,7 @@
   #nameWrap[hidden],#nameWrap[style*="none"],#bianGuaGroup[hidden],#bianGuaGroup[style*="none"]{display:none !important;}
 </style>
 <script>
-try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k.indexOf("v2.6")===-1)caches.delete(k);});});if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.update();});});}catch(e){}
+try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k.indexOf("v2.9")===-1)caches.delete(k);});});if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.update();});});}catch(e){}
 </script>
 </head>
 <body data-sys="qimen">
@@ -87,14 +92,20 @@ try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k
         </div>
       </div>
 
-      <div class="fb-row">
-        <label for="purpose">所测事由</label>
-        <div class="fb-ctl"><select aria-label="所测事由" id="purpose">
+      <div class="fb-row" id="row-question">
+        <label for="question">所问事项</label>
+        <div class="fb-ctl">
+          <input type="text" id="question" placeholder="例如：近期合作谈判能否顺利签约">
+          <select aria-label="所测事由" id="purpose">
             <option value="general">通用</option>
-            <option value="wealth">求财</option>
+            <option value="wealth">求财经营</option>
             <option value="career">事业谋职</option>
-            <option value="travel">出行</option>
+            <option value="relationship">婚恋感情</option>
             <option value="negotiate">谈判合作</option>
+            <option value="study">学业考试</option>
+            <option value="health">健康求医</option>
+            <option value="travel">出行远行</option>
+            <option value="lost">失物寻人</option>
           </select>
         </div>
       </div>
@@ -177,7 +188,7 @@ try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k
     <div id="intro" class="intro">
       <div class="intro-ic">☷</div>
       <h3>奇门遁甲</h3>
-      <p>选择时间与事由后点击「起局排盘」，九宫格局、值符值使、吉凶方位将在此呈现。</p>
+      <p>输入所问事项、选择时间与事由后点击「起局排盘」，九宫格局、值符值使、吉凶方位将在此呈现。</p>
       <div class="intro-tips">
         <span>九宫排布</span><span>值符值使</span><span>八门九星</span><span>吉凶格局</span>
       </div>
@@ -212,9 +223,9 @@ try{if(window.caches)caches.keys().then(function(ks){ks.forEach(function(k){if(k
   本产品内容属传统文化参考，不构成医疗、投资、法律或任何决策建议
 </footer>
 
-<script src="bazi-drill.js?v=20261028v27"></script>
-<script src="cloud-history.js?v=20261028v27"></script>
-<script src="app.js?v=20261028v27"></script>
-<script src="poster.js?v=20261028v27"></script>
+<script src="bazi-drill.js?v=20261028v29"></script>
+<script src="cloud-history.js?v=20261028v29"></script>
+<script src="app.js?v=20261028v29"></script>
+<script src="poster.js?v=20261028v29"></script>
 </body>
 </html>

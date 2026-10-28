@@ -58,6 +58,9 @@ const CSS = `
 .qm2 .hd .b{display:flex;flex-wrap:wrap;justify-content:center;gap:5px 7px;margin-top:6px;font-size:11.5px;color:#5c5243}
 .qm2 .hd .b i{font-style:normal;background:#f7f2e7;border:1px solid var(--line);border-radius:5px;padding:1.5px 6px}
 .qm2 .hd .b i b{color:var(--ink);font-weight:700}
+.qm2 .qm-q{margin-top:6px;padding-top:5px;border-top:1px dashed #e6dcc6;font-size:12.5px;color:#4a3f30;display:flex;align-items:center;justify-content:center;gap:6px}
+.qm2 .qm-q b{color:#6e5832;font-weight:700;letter-spacing:1px}
+.qm2 .qm-q span{font-weight:600;color:var(--ink)}
 .qm2 .hd-stems{position:absolute;right:0;top:50%;transform:translateY(-50%);font-size:11.5px;color:#5c5243;text-align:right;line-height:1.4}
 .qm2 .hd-stems .lab{color:#8a7e68;margin-right:3px}
 .qm2 .hd-stems b{font-family:"Noto Serif SC",serif;font-size:14px;font-weight:800;margin:0 1px}
@@ -411,6 +414,7 @@ export function renderQimen(f) {
         <div class="hd-stems"><span class="lab">四干</span>${fpStems}</div>
       </div>
       <div class="b">${headRow}</div>
+      ${f.question ? `<div class="qm-q"><b>所问事项</b><span>${esc(f.question)}</span></div>` : ''}
     </div>
     ${szTable}
     ${methChips}
@@ -418,6 +422,7 @@ export function renderQimen(f) {
     ${legend}
     <div class="ft">
       <div class="adv">
+        ${f.question ? `<div><b>所问</b> ${esc(f.question)}（事由分类：${esc(f.purpose ? f.purpose.name : '通用')}）</div>` : ''}
         <div><b>用神</b> ${esc(f.purpose ? f.purpose.name : '通用')}：${esc(f.purpose ? f.purpose.note : '')}</div>
         <div><b>吉方</b> ${esc(fav.palaceName || '—')}宫（${esc(fav.direction || '—')}方）· ${esc(fav.door || '—')} · ${esc(fav.star || '—')}　评分 ${fav.score ?? '—'}</div>
         ${patBarHtml}

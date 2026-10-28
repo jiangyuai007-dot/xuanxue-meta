@@ -308,7 +308,7 @@ export const FACT_PRESETS_QIMEN = {
     const dayP = (f.palaces || []).find((p) => p.tianPan === f.pillars?.ri?.gan);
     const hourP = (f.palaces || []).find((p) => p.tianPan === f.pillars?.shi?.gan);
     return (
-      `所测事由：${f.purpose?.name || '通用'}（${f.purpose?.note || ''}）` +
+      `${f.question ? `所问事项：${f.question}｜` : ''}所测事由：${f.purpose?.name || '通用'}（${f.purpose?.note || ''}）` +
       `\n最优吉方：${fav.direction || ''}方（${fav.palaceName || ''}宫，${fav.door || ''}·${fav.star || ''}，评分 ${fav.score ?? 0}，依据：${(fav.why || []).join('、')}）` +
       `\n前三方位：${top3.map((r) => `${r.palaceName}宫(${r.direction}·${r.door}·${r.star}·${r.shen}:${r.score}分)`).join('；')}` +
       `\n主客落宫：日干${f.pillars?.ri?.gan || ''}落${dayP?.name || f.zhiFu?.palaceName || '—'}宫｜时干${f.pillars?.shi?.gan || ''}落${hourP?.name || f.zhiFu?.palaceName || '—'}宫`
