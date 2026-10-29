@@ -1,12 +1,12 @@
 /**
- * 六爻卦象 —— 热卜（移动端）版式 · 36神煞全表精修版 v2.7
+ * 六爻卦象 —— 热卜（移动端）版式 · 36神煞全表 + 世应发动同显精修版 v2.10
  *
  * 结构（自上而下）：
  *  ① 占断信息表  事项/日期/卦式/节气/干支四柱（天干墨黑，仅月支、日支标红）/空亡
- *  ② 神煞区      热卜式严格 4 列对齐网格（36 项全套神煞：含香闺、床帐、世身、胎爻、天马、生气、死气、游都、飞符等）+ 右上角「收起/展开」开关
+ *  ② 神煞区      热卜式严格 4 列对齐网格（36 项全套神煞：含香闺、床帐、世身、胎爻、天马、生气、死气、游都、飞符等）+ 左侧「收起/展开」开关（不挤占第4列宽度）
  *  ③ 卦象区      智能区分【静卦】与【动变之卦】：
  *               - 静卦（无动爻且本变同卦）：对标热卜，居中仅展示单一本卦（五列：六兽｜六亲｜纳甲｜爻画｜世应），绝不重复渲染两个相同卦！
- *               - 动变卦（有动爻或指定变卦）：热卜式八列左右并排（本卦 + 变卦），爻画与地支墨黑，仅中间动爻符号 0→ / X→ 标红。
+ *               - 动变卦（有动爻或指定变卦）：热卜式八列左右并排（本卦 + 变卦），世爻/应爻发动时同时显示「世/应」与「0→/X→」，绝不吞掉世应标记！
  */
 
 import { esc, list } from './shared.js';
@@ -23,16 +23,16 @@ const METHOD_NAME = {
 
 const CSS = `
 .ly3{--ink:#241f18;--sub:#8b8172;--gold:#b0812b;--line:#e7ddc9;--red:#c8281d;
-  --ly8:26px 46px minmax(82px,1.2fr) minmax(80px,1.5fr) 48px minmax(80px,1.5fr) minmax(68px,1fr) 44px;
+  --ly8:26px 46px minmax(80px,1.2fr) minmax(76px,1.45fr) 56px minmax(76px,1.45fr) minmax(66px,1fr) 44px;
   --ly5:28px 50px 86px 104px 36px;
   max-width:860px;margin:0 auto;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",sans-serif;font-size:13px}
 .ly3 *{box-sizing:border-box}
 .ly3 .sheet{background:linear-gradient(180deg,#fffdf8,#fbf7ee);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 10px 26px -18px rgba(80,60,30,.4)}
 /* —— 信息表 —— */
-.ly3 .iro{display:grid;grid-template-columns:68px 1fr;border-bottom:1px solid #efe8d8}
+.ly3 .iro{display:grid;grid-template-columns:64px 1fr;border-bottom:1px solid #efe8d8}
 .ly3 .iro:last-of-type{border-bottom:0}
-.ly3 .ik{display:flex;align-items:center;justify-content:center;padding:8px 4px;font-size:13px;color:var(--gold);background:#fbf6ea;border-right:1px solid #efe8d8;letter-spacing:2px}
-.ly3 .iv{padding:8px 12px;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.ly3 .ik{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px 4px;font-size:13px;color:var(--gold);background:#fbf6ea;border-right:1px solid #efe8d8;letter-spacing:2px}
+.ly3 .iv{padding:8px 10px;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-width:0}
 .ly3 .iv.center{justify-content:center}
 .ly3 .gz4{display:grid;grid-template-columns:repeat(4,1fr);width:100%;gap:0}
 .ly3 .gz4>span{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 0;border-right:1px solid #f0e8d6}
@@ -44,16 +44,15 @@ const CSS = `
 .ly3 .xk4 span{text-align:center;font-size:12.5px;color:#8a7e68;letter-spacing:2px;border-right:1px solid #f0e8d6}
 .ly3 .xk4 span:last-child{border-right:0}
 .ly3 .q{font-weight:600;color:#4a4032}
-/* —— 神煞（热卜式 4 列严整网格 + 收起/展开） —— */
+/* —— 神煞（热卜式 4 列严整网格 + 左侧收起/展开按钮，第4列不再被挤压截断） —— */
 .ly3 .ss-wrap{width:100%}
-.ly3 .ss-head-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
-.ly3 .ss-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 8px;width:100%;align-items:center}
-.ly3 .ss-wrap.is-folded .ss-grid .ss-item:nth-child(n+5){display:none}
+.ly3 .ss-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 6px;width:100%;align-items:center}
+.ly3 .iro.is-folded .ss-grid .ss-item:nth-child(n+5){display:none}
 .ly3 .ss-item{font-size:13px;color:#241f18;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}
 .ly3 .ss-item b{color:#241f18;font-weight:500}
 .ly3 .ss-item.in b{color:#241f18}
-.ly3 .ss-toggle{border:none;background:transparent;color:#1f7a68;font-size:12px;font-weight:600;cursor:pointer;padding:0 2px;margin-left:auto}
-.ly3 .ss-toggle:hover{text-decoration:underline}
+.ly3 .ss-toggle{border:1px solid #c8dfd8;border-radius:4px;background:#f0f7f5;color:#1f7a68;font-size:11px;font-weight:600;cursor:pointer;padding:1px 5px;letter-spacing:0;line-height:1.4}
+.ly3 .ss-toggle:hover{background:#e2f0ec}
 /* —— 卦象区 —— */
 .ly3 .wrap{display:flex;flex-direction:column;padding:12px 8px}
 .ly3 .lrows{display:flex;flex-direction:column;gap:2px}
@@ -95,18 +94,19 @@ const CSS = `
 .ly3 .yao{width:88px;height:10px;border-radius:2px;background:#241f18;flex:0 0 auto}
 .ly3 .yao.yin{background:transparent;display:flex;justify-content:space-between}
 .ly3 .yao.yin::before,.ly3 .yao.yin::after{content:"";width:42%;height:10px;border-radius:2px;background:#241f18}
-/* 中缝 / 世应列 */
-.ly3 .lmc{display:flex;align-items:center;justify-content:center;gap:2px;min-width:0}
+/* 中缝 / 世应列（世爻或应爻发动时，世/应标签与 0→/X→ 并列同显） */
+.ly3 .lmc{display:flex;align-items:center;justify-content:center;gap:2px;min-width:0;white-space:nowrap}
 .ly3 .lmk{font-style:normal;font-size:12px;font-weight:800;line-height:1;color:#c8281d;white-space:nowrap}
-.ly3 .ltag{font-style:normal;font-size:11px;font-weight:700;line-height:1.4;padding:0 4px;border-radius:3px;white-space:nowrap;
+.ly3 .ltag{font-style:normal;font-size:11px;font-weight:700;line-height:1.35;padding:0 3.5px;border-radius:3px;white-space:nowrap;
   color:#241f18;background:#f3ead6;border:1px solid #dfd1b4}
+.ly3 .ltag.shi{color:#8c2318;background:#fdeae6;border-color:#efb9b0}
 /* —— 底部注记 —— */
 .ly3 .props{margin:0 12px 12px;padding:9px 12px;background:#fffdf8;border:1px solid var(--line);border-radius:11px}
 .ly3 .prow{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:#6d6353;line-height:1.8}
 .ly3 .prow .k{color:#a2977f}
 .ly3 .prow b{color:#3b332a;font-weight:600}
 @media (max-width:640px){
-  .ly3{--ly8:22px 40px minmax(0,1fr) minmax(0,1.15fr) 42px minmax(0,1.15fr) minmax(0,1fr) 38px;
+  .ly3{--ly8:22px 38px minmax(0,1fr) minmax(0,1.1fr) 48px minmax(0,1.1fr) minmax(0,1fr) 36px;
        --ly5:26px 46px 82px 96px 34px}
   .ly3 .wrap{padding:10px 4px}
   .ly3 .ghd .gt{font-size:16px}
@@ -114,18 +114,22 @@ const CSS = `
   .ly3 .ls{font-size:13.5px}
   .ly3 .lq{font-size:12px}
   .ly3 .lz{font-size:14.5px}
-  .ly3 .yao{width:100%;max-width:62px;height:9px}
+  .ly3 .yao{width:100%;max-width:60px;height:9px}
   .ly3 .lrow.single .yao{max-width:86px;height:10px}
   .ly3 .yao.yin::before,.ly3 .yao.yin::after{height:9px}
   .ly3 .lrow.single .yao.yin::before,.ly3 .lrow.single .yao.yin::after{height:10px}
   .ly3 .gz4 b{font-size:19px}
+  .ly3 .iv{padding:7px 8px}
   .ly3 .ss-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px 4px}
   .ly3 .ss-item{font-size:12px}
+  .ly3 .ltag{font-size:10px;padding:0 2.5px}
+  .ly3 .lmk{font-size:11px}
 }
 @media (max-width:420px){
-  .ly3{--ly8:20px 34px minmax(0,1fr) minmax(0,1fr) 36px minmax(0,1fr) minmax(0,1fr) 34px;
+  .ly3{--ly8:20px 34px minmax(0,1fr) minmax(0,1fr) 44px minmax(0,1fr) minmax(0,1fr) 34px;
        --ly5:24px 42px 76px 88px 32px}
-  .ly3 .iro{grid-template-columns:54px 1fr}.ly3 .ik{letter-spacing:1px;padding:8px 2px}
+  .ly3 .iro{grid-template-columns:48px 1fr}.ly3 .ik{letter-spacing:1px;padding:6px 2px;font-size:12px}
+  .ly3 .iv{padding:6px 6px}
   .ly3 .ss-item{font-size:11.5px}
 }
 /* —— 卦辞解释 —— */
@@ -258,20 +262,14 @@ export function renderLiuyao(f) {
     ['空亡', `<div class="xk4">${xkCell('year')}${xkCell('month')}${xkCell('day')}${xkCell('hour')}</div>`],
   ].map(([k, v]) => `<div class="iro"><div class="ik">${k}</div><div class="iv">${v}</div></div>`).join('');
 
-  // —— ② 神煞区（严格 4 列网格 + 右上角收起/展开按钮） ——
+  // —— ② 神煞区（严格 4 列网格 + 左侧栏收起/展开按钮，不挤占第 4 列） ——
   const cleanSs = buildCleanShenshaList(f);
-  const ssCells = cleanSs.map((s, idx) => {
-    if (idx === 3) {
-      return `<span class="ss-item${s.inGua ? ' in' : ''}" title="${esc(s.tip)}" style="display:flex;align-items:center;justify-content:space-between">
-        <span><b>${esc(s.name)}</b>--${esc(s.val)}</span>
-        <button type="button" class="ss-toggle" onclick="var w=this.closest('.ss-wrap');w.classList.toggle('is-folded');this.textContent=w.classList.contains('is-folded')?'展开':'收起'">收起</button>
-      </span>`;
-    }
-    return `<span class="ss-item${s.inGua ? ' in' : ''}" title="${esc(s.tip)}"><b>${esc(s.name)}</b>--${esc(s.val)}</span>`;
-  }).join('');
+  const ssCells = cleanSs.map((s) =>
+    `<span class="ss-item${s.inGua ? ' in' : ''}" title="${esc(s.tip)}"><b>${esc(s.name)}</b>--${esc(s.val)}</span>`
+  ).join('');
 
   const shenshaBlock = ssCells
-    ? `<div class="iro"><div class="ik">神煞</div><div class="iv"><div class="ss-wrap"><div class="ss-grid">${ssCells}</div></div></div></div>`
+    ? `<div class="iro"><div class="ik"><span>神煞</span><button type="button" class="ss-toggle" onclick="var r=this.closest('.iro');r.classList.toggle('is-folded');this.textContent=r.classList.contains('is-folded')?'展开':'收起'">收起</button></div><div class="iv"><div class="ss-wrap"><div class="ss-grid">${ssCells}</div></div></div></div>`
     : '';
 
   // —— ③ 卦象区（静卦单卦居中 vs 动卦双卦并排） ——
@@ -300,7 +298,7 @@ export function renderLiuyao(f) {
         l.xunkong ? '空' : '',
       ].filter(Boolean);
       const mark = marks.map((m) => `<i class="ymk ${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
-      const shiYingTag = l.isShi ? '<i class="ltag">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : '');
+      const shiYingTag = l.isShi ? '<i class="ltag shi">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : '');
       return `<div class="${cls}">
         <div class="ls">${esc(SHEN_CHAR[l.liushen] || '—')}</div>
         <div class="lq">${esc(l.liuqin)}${mark}</div>
@@ -329,9 +327,10 @@ export function renderLiuyao(f) {
         l.xunkong ? '空' : '',
       ].filter(Boolean);
       const mark = marks.map((m) => `<i class="ymk ${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
-      const mid = l.isDong
-        ? `<i class="lmk">${y ? '0' : 'X'}→</i>`
-        : (l.isShi ? '<i class="ltag">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : ''));
+      // 关键修复：当世爻或应爻同时为动爻（世爻发动 / 应爻发动）时，必须同时渲染「世/应」与「0→/X→」，不可因动爻吞掉世应标记！
+      const shiYingTag = l.isShi ? '<i class="ltag shi">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : '');
+      const dongTag = l.isDong ? `<i class="lmk">${y ? '0' : 'X'}→</i>` : '';
+      const mid = shiYingTag + dongTag;
       const b = bianLines[i] || {};
       return `<div class="${cls}">
         <div class="ls">${esc(SHEN_CHAR[l.liushen] || '—')}</div>
