@@ -100,6 +100,7 @@ const CSS = `
 .ly3 .ltag{font-style:normal;font-size:11px;font-weight:700;line-height:1.35;padding:0 3.5px;border-radius:3px;white-space:nowrap;
   color:#241f18;background:#f3ead6;border:1px solid #dfd1b4}
 .ly3 .ltag.shi{color:#8c2318;background:#fdeae6;border-color:#efb9b0}
+.ly3 .ltag.ying{color:#284b7a;background:#eaf1fb;border-color:#b8cde8}
 /* —— 底部注记 —— */
 .ly3 .props{margin:0 12px 12px;padding:9px 12px;background:#fffdf8;border:1px solid var(--line);border-radius:11px}
 .ly3 .prow{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:#6d6353;line-height:1.8}
@@ -298,7 +299,7 @@ export function renderLiuyao(f) {
         l.xunkong ? '空' : '',
       ].filter(Boolean);
       const mark = marks.map((m) => `<i class="ymk ${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
-      const shiYingTag = l.isShi ? '<i class="ltag shi">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : '');
+      const shiYingTag = l.isShi ? '<i class="ltag shi">世</i>' : (l.isYing ? '<i class="ltag ying">应</i>' : '');
       return `<div class="${cls}">
         <div class="ls">${esc(SHEN_CHAR[l.liushen] || '—')}</div>
         <div class="lq">${esc(l.liuqin)}${mark}</div>
@@ -328,7 +329,7 @@ export function renderLiuyao(f) {
       ].filter(Boolean);
       const mark = marks.map((m) => `<i class="ymk ${{ 身: 'bd', 破: 'po', 空: 'kk' }[m]}">${m}</i>`).join('');
       // 关键修复：当世爻或应爻同时为动爻（世爻发动 / 应爻发动）时，必须同时渲染「世/应」与「0→/X→」，不可因动爻吞掉世应标记！
-      const shiYingTag = l.isShi ? '<i class="ltag shi">世</i>' : (l.isYing ? '<i class="ltag">应</i>' : '');
+      const shiYingTag = l.isShi ? '<i class="ltag shi">世</i>' : (l.isYing ? '<i class="ltag ying">应</i>' : '');
       const dongTag = l.isDong ? `<i class="lmk">${y ? '0' : 'X'}→</i>` : '';
       const mid = shiYingTag + dongTag;
       const b = bianLines[i] || {};
